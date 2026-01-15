@@ -1,7 +1,7 @@
 ============================================================================
 Claude Code & MCP Servers Installer
 ============================================================================
-Version: 1.0.0
+Version: 2.0.0
 Author: Quality By Design NV
 
 DESCRIPTION
@@ -9,6 +9,10 @@ DESCRIPTION
 This installer sets up Claude Code CLI and configures MCP (Model Context
 Protocol) servers for Claude Desktop. It handles all prerequisites and
 allows users to choose which MCP servers to install.
+
+NEW IN VERSION 2.0: Modern Windows Forms GUI with dark theme, visual
+component status indicators, checkbox-based server selection, and
+real-time progress tracking.
 
 REQUIREMENTS
 ------------
@@ -55,17 +59,22 @@ AVAILABLE MCP SERVERS
 
 HOW TO USE
 ----------
-Method 1: Double-click the batch file
+Method 1: Double-click the batch file (Recommended)
   - Double-click "Install-ClaudeMCP.bat"
-  - Follow the on-screen instructions
+  - The graphical installer will launch
+  - Check the MCP servers you want to install
+  - Click "Install Selected"
 
 Method 2: Run PowerShell directly
   - Open PowerShell
   - Navigate to this folder
   - Run: .\Install-ClaudeMCP.ps1
 
-Method 3: With parameters
-  - Skip prerequisites check: .\Install-ClaudeMCP.ps1 -SkipPrerequisites
+Method 3: Console mode (text-based menu)
+  - Run: .\Install-ClaudeMCP.ps1 -Console
+
+Method 4: With parameters
+  - Skip prerequisites check: .\Install-ClaudeMCP.ps1 -SkipPrerequisites -Console
 
 WHAT THE INSTALLER DOES
 -----------------------
