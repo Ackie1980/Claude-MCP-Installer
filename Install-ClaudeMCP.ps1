@@ -577,7 +577,7 @@ $MCPServers = @{
         Description = "Power BI semantic model manipulation via Tabular Editor"
         Type = "executable"
         RequiresPath = $true
-        PathPrompt = "Enter the path to your PowerBI Modeling MCP installation"
+        PathPrompt = "Enter the path to your PowerBI Modeling MCP installation (auto-detected based on your Windows username)"
         PathDefault = "$env:USERPROFILE\.vscode\extensions"
         PathPattern = "analysis-services.powerbi-modeling-mcp-*-win32-x64"
         Config = @{
@@ -1331,7 +1331,8 @@ function Build-MCPConfig {
 
         # Handle embedded watchdog script
         if ($server.Type -eq "embedded-python") {
-            $watchdogPath = Install-WatchdogScript
+            # Capture only the return value, suppress any other output
+            $watchdogPath = (Install-WatchdogScript | Select-Object -Last 1)
 
             # Install required Python packages
             if ($server.PythonPackages) {
@@ -1873,7 +1874,8 @@ function Show-GUI {
                 # Handle embedded watchdog script
                 if ($server.Type -eq "embedded-python") {
                     Update-GuiLog "Installing watchdog script..."
-                    $watchdogPath = Install-WatchdogScript
+                    # Capture only the return value, suppress any other output
+                    $watchdogPath = (Install-WatchdogScript | Select-Object -Last 1)
 
                     if ($server.PythonPackages) {
                         Update-GuiLog "Installing Python packages..."
