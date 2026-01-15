@@ -1334,7 +1334,7 @@ function Build-MCPConfig {
 
             # Install required Python packages
             if ($server.PythonPackages) {
-                Install-PythonPackages -Packages $server.PythonPackages
+                $null = Install-PythonPackages -Packages $server.PythonPackages
             }
 
             $config.command = $server.Config.command
