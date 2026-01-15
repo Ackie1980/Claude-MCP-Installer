@@ -1497,14 +1497,18 @@ function Show-GUI {
     Write-Log "GUI mode started" "INFO"
 
     # Define colors for the GUI
-    $primaryColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
-    $secondaryColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
-    $accentColor = [System.Drawing.Color]::FromArgb(0, 122, 204)
-    $successColor = [System.Drawing.Color]::FromArgb(78, 201, 176)
-    $warningColor = [System.Drawing.Color]::FromArgb(255, 200, 87)
-    $errorColor = [System.Drawing.Color]::FromArgb(244, 71, 71)
-    $textColor = [System.Drawing.Color]::White
-    $textMuted = [System.Drawing.Color]::FromArgb(180, 180, 180)
+    # Modern dark theme color palette
+    $primaryColor = [System.Drawing.Color]::FromArgb(28, 28, 32)
+    $secondaryColor = [System.Drawing.Color]::FromArgb(38, 38, 42)
+    $cardColor = [System.Drawing.Color]::FromArgb(48, 48, 54)
+    $accentColor = [System.Drawing.Color]::FromArgb(218, 119, 86)  # Claude orange
+    $accentHover = [System.Drawing.Color]::FromArgb(238, 139, 106)
+    $successColor = [System.Drawing.Color]::FromArgb(78, 201, 140)
+    $warningColor = [System.Drawing.Color]::FromArgb(255, 193, 77)
+    $errorColor = [System.Drawing.Color]::FromArgb(255, 99, 99)
+    $textColor = [System.Drawing.Color]::FromArgb(245, 245, 247)
+    $textMuted = [System.Drawing.Color]::FromArgb(150, 150, 158)
+    $borderColor = [System.Drawing.Color]::FromArgb(68, 68, 76)
 
     # Create main form
     $form = New-Object System.Windows.Forms.Form
@@ -1517,21 +1521,30 @@ function Show-GUI {
     $form.MaximizeBox = $false
     $form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-    # Header Panel
+    # Header Panel with gradient effect
     $headerPanel = New-Object System.Windows.Forms.Panel
-    $headerPanel.Size = New-Object System.Drawing.Size(800, 80)
+    $headerPanel.Size = New-Object System.Drawing.Size(800, 90)
     $headerPanel.Location = New-Object System.Drawing.Point(0, 0)
     $headerPanel.BackColor = $secondaryColor
     $form.Controls.Add($headerPanel)
 
-    # Title Label
-    $titleLabel = New-Object System.Windows.Forms.Label
-    $titleLabel.Text = "Claude Code & MCP Servers Installer"
-    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 18, [System.Drawing.FontStyle]::Bold)
-    $titleLabel.ForeColor = $textColor
-    $titleLabel.AutoSize = $true
-    $titleLabel.Location = New-Object System.Drawing.Point(20, 15)
-    $headerPanel.Controls.Add($titleLabel)
+    # Title - "Claude" in accent color
+    $titleClaude = New-Object System.Windows.Forms.Label
+    $titleClaude.Text = "Claude"
+    $titleClaude.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 22)
+    $titleClaude.ForeColor = $accentColor
+    $titleClaude.AutoSize = $true
+    $titleClaude.Location = New-Object System.Drawing.Point(25, 18)
+    $headerPanel.Controls.Add($titleClaude)
+
+    # Title - "MCP Server Installer" in white
+    $titleRest = New-Object System.Windows.Forms.Label
+    $titleRest.Text = "MCP Server Installer"
+    $titleRest.Font = New-Object System.Drawing.Font("Segoe UI Light", 22)
+    $titleRest.ForeColor = $textColor
+    $titleRest.AutoSize = $true
+    $titleRest.Location = New-Object System.Drawing.Point(130, 18)
+    $headerPanel.Controls.Add($titleRest)
 
     # Subtitle Label
     $subtitleLabel = New-Object System.Windows.Forms.Label
@@ -1539,131 +1552,166 @@ function Show-GUI {
     $subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     $subtitleLabel.ForeColor = $textMuted
     $subtitleLabel.AutoSize = $true
-    $subtitleLabel.Location = New-Object System.Drawing.Point(20, 50)
+    $subtitleLabel.Location = New-Object System.Drawing.Point(27, 58)
     $headerPanel.Controls.Add($subtitleLabel)
 
-    # Version Label
+    # Version Label with badge style
     $versionLabel = New-Object System.Windows.Forms.Label
-    $versionLabel.Text = "v2.0.0"
+    $versionLabel.Text = "v2.1.0"
     $versionLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $versionLabel.ForeColor = $textMuted
+    $versionLabel.ForeColor = $accentColor
     $versionLabel.AutoSize = $true
-    $versionLabel.Location = New-Object System.Drawing.Point(720, 55)
+    $versionLabel.Location = New-Object System.Drawing.Point(720, 35)
     $headerPanel.Controls.Add($versionLabel)
 
     # ========================================
-    # Component Status Panel
+    # Component Status Panel - Card Style
     # ========================================
-    $statusGroupBox = New-Object System.Windows.Forms.GroupBox
-    $statusGroupBox.Text = "System Components"
-    $statusGroupBox.ForeColor = $textColor
-    $statusGroupBox.Size = New-Object System.Drawing.Size(750, 100)
-    $statusGroupBox.Location = New-Object System.Drawing.Point(20, 90)
-    $form.Controls.Add($statusGroupBox)
+    $statusPanel = New-Object System.Windows.Forms.Panel
+    $statusPanel.Size = New-Object System.Drawing.Size(750, 85)
+    $statusPanel.Location = New-Object System.Drawing.Point(20, 100)
+    $statusPanel.BackColor = $primaryColor
+    $form.Controls.Add($statusPanel)
 
-    # Component status labels
+    # Component status cards
     $componentLabels = @{}
     $componentIcons = @{}
+    $componentCards = @{}
     $components = @("Node.js", "Python", "UV", "Claude Code")
-    $xPos = 20
+    $xPos = 0
+    $cardWidth = 175
 
     foreach ($comp in $components) {
+        # Card panel for each component
+        $card = New-Object System.Windows.Forms.Panel
+        $card.Size = New-Object System.Drawing.Size($cardWidth, 75)
+        $card.Location = New-Object System.Drawing.Point($xPos, 5)
+        $card.BackColor = $cardColor
+        $statusPanel.Controls.Add($card)
+        $componentCards[$comp] = $card
+
+        # Status icon (circle)
         $icon = New-Object System.Windows.Forms.Label
         $icon.Text = [char]0x25CF  # Circle bullet
-        $icon.Font = New-Object System.Drawing.Font("Segoe UI", 14)
+        $icon.Font = New-Object System.Drawing.Font("Segoe UI", 12)
+        $icon.ForeColor = $textMuted
         $icon.AutoSize = $true
-        $icon.Location = New-Object System.Drawing.Point($xPos, 30)
-        $statusGroupBox.Controls.Add($icon)
+        $icon.Location = New-Object System.Drawing.Point(12, 12)
+        $card.Controls.Add($icon)
         $componentIcons[$comp] = $icon
 
+        # Component name
         $label = New-Object System.Windows.Forms.Label
         $label.Text = $comp
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $label.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
         $label.ForeColor = $textColor
         $label.AutoSize = $true
-        $label.Location = New-Object System.Drawing.Point(($xPos + 20), 32)
-        $statusGroupBox.Controls.Add($label)
+        $label.Location = New-Object System.Drawing.Point(32, 10)
+        $card.Controls.Add($label)
 
+        # Version/status label
         $statusLabel = New-Object System.Windows.Forms.Label
         $statusLabel.Text = "Checking..."
-        $statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+        $statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
         $statusLabel.ForeColor = $textMuted
         $statusLabel.AutoSize = $true
-        $statusLabel.Location = New-Object System.Drawing.Point($xPos, 55)
-        $statusGroupBox.Controls.Add($statusLabel)
+        $statusLabel.Location = New-Object System.Drawing.Point(12, 42)
+        $card.Controls.Add($statusLabel)
         $componentLabels[$comp] = $statusLabel
 
-        $xPos += 180
+        $xPos += $cardWidth + 12
     }
 
     # ========================================
     # MCP Servers Selection Panel
     # ========================================
-    $serversGroupBox = New-Object System.Windows.Forms.GroupBox
-    $serversGroupBox.Text = "Select MCP Servers to Install"
-    $serversGroupBox.ForeColor = $textColor
-    $serversGroupBox.Size = New-Object System.Drawing.Size(750, 280)
-    $serversGroupBox.Location = New-Object System.Drawing.Point(20, 195)
-    $form.Controls.Add($serversGroupBox)
+    # Section title
+    $serversTitle = New-Object System.Windows.Forms.Label
+    $serversTitle.Text = "Select MCP Servers"
+    $serversTitle.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 11)
+    $serversTitle.ForeColor = $textColor
+    $serversTitle.AutoSize = $true
+    $serversTitle.Location = New-Object System.Drawing.Point(25, 195)
+    $form.Controls.Add($serversTitle)
 
-    # Create scrollable panel for checkboxes
+    # Create scrollable panel for server cards
     $scrollPanel = New-Object System.Windows.Forms.Panel
-    $scrollPanel.Size = New-Object System.Drawing.Size(730, 240)
-    $scrollPanel.Location = New-Object System.Drawing.Point(10, 20)
+    $scrollPanel.Size = New-Object System.Drawing.Size(750, 265)
+    $scrollPanel.Location = New-Object System.Drawing.Point(20, 220)
     $scrollPanel.AutoScroll = $true
     $scrollPanel.BackColor = $primaryColor
-    $serversGroupBox.Controls.Add($scrollPanel)
+    $form.Controls.Add($scrollPanel)
 
-    # Create checkboxes for each MCP server
+    # Create card-style items for each MCP server
     $serverCheckboxes = @{}
-    $yPos = 5
+    $yPos = 0
 
     foreach ($key in $MCPServers.Keys | Sort-Object) {
         $server = $MCPServers[$key]
 
+        # Server item panel (card style)
+        $serverCard = New-Object System.Windows.Forms.Panel
+        $serverCard.Size = New-Object System.Drawing.Size(710, 65)
+        $serverCard.Location = New-Object System.Drawing.Point(5, $yPos)
+        $serverCard.BackColor = $cardColor
+        $scrollPanel.Controls.Add($serverCard)
+
+        # Checkbox
         $checkbox = New-Object System.Windows.Forms.CheckBox
-        $checkbox.Text = $server.Name
-        $checkbox.Font = New-Object System.Drawing.Font("Segoe UI", 10)
-        $checkbox.ForeColor = $textColor
-        $checkbox.AutoSize = $true
-        $checkbox.Location = New-Object System.Drawing.Point(10, $yPos)
+        $checkbox.Text = ""
+        $checkbox.Size = New-Object System.Drawing.Size(20, 20)
+        $checkbox.Location = New-Object System.Drawing.Point(15, 22)
         $checkbox.Tag = $key
         $checkbox.Checked = $false
-        $scrollPanel.Controls.Add($checkbox)
+        $checkbox.BackColor = $cardColor
+        $serverCard.Controls.Add($checkbox)
         $serverCheckboxes[$key] = $checkbox
 
+        # Server name
+        $nameLabel = New-Object System.Windows.Forms.Label
+        $nameLabel.Text = $server.Name
+        $nameLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+        $nameLabel.ForeColor = $textColor
+        $nameLabel.AutoSize = $true
+        $nameLabel.Location = New-Object System.Drawing.Point(45, 12)
+        $serverCard.Controls.Add($nameLabel)
+
+        # Description
         $descLabel = New-Object System.Windows.Forms.Label
         $descLabel.Text = $server.Description
-        $descLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+        $descLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
         $descLabel.ForeColor = $textMuted
         $descLabel.AutoSize = $true
-        $descLabel.Location = New-Object System.Drawing.Point(30, ($yPos + 22))
-        $scrollPanel.Controls.Add($descLabel)
+        $descLabel.Location = New-Object System.Drawing.Point(45, 34)
+        $serverCard.Controls.Add($descLabel)
 
-        # Prerequisites warning label
+        # Prerequisites badge (right side)
         if ($server.Prerequisites) {
             $prereqLabel = New-Object System.Windows.Forms.Label
-            $prereqLabel.Text = "Requires: $($server.Prerequisites -join ', ')"
-            $prereqLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Italic)
+            $prereqLabel.Text = $server.Prerequisites -join ", "
+            $prereqLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
             $prereqLabel.ForeColor = $warningColor
             $prereqLabel.AutoSize = $true
-            $prereqLabel.Location = New-Object System.Drawing.Point(30, ($yPos + 38))
+            $prereqLabel.Location = New-Object System.Drawing.Point(580, 22)
             $prereqLabel.Tag = "prereq_$key"
-            $scrollPanel.Controls.Add($prereqLabel)
-            $yPos += 60
-        } else {
-            $yPos += 48
+            $serverCard.Controls.Add($prereqLabel)
         }
+
+        $yPos += 72
     }
 
-    # Select All / Deselect All buttons
+    # Select All / Deselect All buttons (smaller, positioned inline)
     $selectAllBtn = New-Object System.Windows.Forms.Button
     $selectAllBtn.Text = "Select All"
-    $selectAllBtn.Size = New-Object System.Drawing.Size(100, 30)
-    $selectAllBtn.Location = New-Object System.Drawing.Point(20, 480)
-    $selectAllBtn.BackColor = $accentColor
+    $selectAllBtn.Size = New-Object System.Drawing.Size(90, 28)
+    $selectAllBtn.Location = New-Object System.Drawing.Point(25, 490)
+    $selectAllBtn.BackColor = $cardColor
     $selectAllBtn.ForeColor = $textColor
     $selectAllBtn.FlatStyle = "Flat"
+    $selectAllBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $selectAllBtn.FlatAppearance.BorderColor = $borderColor
+    $selectAllBtn.FlatAppearance.BorderSize = 1
+    $selectAllBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $selectAllBtn.Add_Click({
         foreach ($cb in $serverCheckboxes.Values) {
             if ($cb.Enabled) { $cb.Checked = $true }
@@ -1673,11 +1721,15 @@ function Show-GUI {
 
     $deselectAllBtn = New-Object System.Windows.Forms.Button
     $deselectAllBtn.Text = "Deselect All"
-    $deselectAllBtn.Size = New-Object System.Drawing.Size(100, 30)
-    $deselectAllBtn.Location = New-Object System.Drawing.Point(130, 480)
-    $deselectAllBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
-    $deselectAllBtn.ForeColor = $textColor
+    $deselectAllBtn.Size = New-Object System.Drawing.Size(90, 28)
+    $deselectAllBtn.Location = New-Object System.Drawing.Point(125, 490)
+    $deselectAllBtn.BackColor = $cardColor
+    $deselectAllBtn.ForeColor = $textMuted
     $deselectAllBtn.FlatStyle = "Flat"
+    $deselectAllBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $deselectAllBtn.FlatAppearance.BorderColor = $borderColor
+    $deselectAllBtn.FlatAppearance.BorderSize = 1
+    $deselectAllBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $deselectAllBtn.Add_Click({
         foreach ($cb in $serverCheckboxes.Values) {
             $cb.Checked = $false
@@ -1686,30 +1738,29 @@ function Show-GUI {
     $form.Controls.Add($deselectAllBtn)
 
     # ========================================
-    # Progress and Log Panel
+    # Progress Section
     # ========================================
-    $logGroupBox = New-Object System.Windows.Forms.GroupBox
-    $logGroupBox.Text = "Installation Progress"
-    $logGroupBox.ForeColor = $textColor
-    $logGroupBox.Size = New-Object System.Drawing.Size(750, 120)
-    $logGroupBox.Location = New-Object System.Drawing.Point(20, 515)
-    $form.Controls.Add($logGroupBox)
-
-    # Progress bar
-    $progressBar = New-Object System.Windows.Forms.ProgressBar
-    $progressBar.Size = New-Object System.Drawing.Size(720, 20)
-    $progressBar.Location = New-Object System.Drawing.Point(10, 25)
-    $progressBar.Style = "Continuous"
-    $logGroupBox.Controls.Add($progressBar)
+    $progressPanel = New-Object System.Windows.Forms.Panel
+    $progressPanel.Size = New-Object System.Drawing.Size(750, 100)
+    $progressPanel.Location = New-Object System.Drawing.Point(20, 528)
+    $progressPanel.BackColor = $cardColor
+    $form.Controls.Add($progressPanel)
 
     # Status text
     $statusText = New-Object System.Windows.Forms.Label
     $statusText.Text = "Ready to install"
-    $statusText.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $statusText.ForeColor = $textMuted
-    $statusText.Size = New-Object System.Drawing.Size(720, 20)
-    $statusText.Location = New-Object System.Drawing.Point(10, 50)
-    $logGroupBox.Controls.Add($statusText)
+    $statusText.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $statusText.ForeColor = $textColor
+    $statusText.Size = New-Object System.Drawing.Size(720, 22)
+    $statusText.Location = New-Object System.Drawing.Point(15, 12)
+    $progressPanel.Controls.Add($statusText)
+
+    # Progress bar (styled)
+    $progressBar = New-Object System.Windows.Forms.ProgressBar
+    $progressBar.Size = New-Object System.Drawing.Size(720, 8)
+    $progressBar.Location = New-Object System.Drawing.Point(15, 40)
+    $progressBar.Style = "Continuous"
+    $progressPanel.Controls.Add($progressBar)
 
     # Log textbox
     $logTextBox = New-Object System.Windows.Forms.TextBox
@@ -1718,31 +1769,38 @@ function Show-GUI {
     $logTextBox.ReadOnly = $true
     $logTextBox.BackColor = $secondaryColor
     $logTextBox.ForeColor = $textMuted
-    $logTextBox.Font = New-Object System.Drawing.Font("Consolas", 8)
+    $logTextBox.Font = New-Object System.Drawing.Font("Cascadia Code", 8)
     $logTextBox.Size = New-Object System.Drawing.Size(720, 40)
-    $logTextBox.Location = New-Object System.Drawing.Point(10, 72)
-    $logGroupBox.Controls.Add($logTextBox)
+    $logTextBox.Location = New-Object System.Drawing.Point(15, 55)
+    $logTextBox.BorderStyle = "None"
+    $progressPanel.Controls.Add($logTextBox)
 
     # ========================================
     # Action Buttons
     # ========================================
     $installBtn = New-Object System.Windows.Forms.Button
     $installBtn.Text = "Install Selected"
-    $installBtn.Size = New-Object System.Drawing.Size(140, 40)
-    $installBtn.Location = New-Object System.Drawing.Point(510, 640)
-    $installBtn.BackColor = $successColor
-    $installBtn.ForeColor = $secondaryColor
-    $installBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $installBtn.Size = New-Object System.Drawing.Size(150, 42)
+    $installBtn.Location = New-Object System.Drawing.Point(500, 640)
+    $installBtn.BackColor = $accentColor
+    $installBtn.ForeColor = $textColor
+    $installBtn.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
     $installBtn.FlatStyle = "Flat"
+    $installBtn.FlatAppearance.BorderSize = 0
+    $installBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $form.Controls.Add($installBtn)
 
     $cancelBtn = New-Object System.Windows.Forms.Button
     $cancelBtn.Text = "Cancel"
-    $cancelBtn.Size = New-Object System.Drawing.Size(100, 40)
+    $cancelBtn.Size = New-Object System.Drawing.Size(100, 42)
     $cancelBtn.Location = New-Object System.Drawing.Point(660, 640)
-    $cancelBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
-    $cancelBtn.ForeColor = $textColor
+    $cancelBtn.BackColor = $cardColor
+    $cancelBtn.ForeColor = $textMuted
+    $cancelBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     $cancelBtn.FlatStyle = "Flat"
+    $cancelBtn.FlatAppearance.BorderColor = $borderColor
+    $cancelBtn.FlatAppearance.BorderSize = 1
+    $cancelBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $cancelBtn.Add_Click({ $form.Close() })
     $form.Controls.Add($cancelBtn)
 
