@@ -576,9 +576,10 @@ $MCPServers = @{
         Name = "PowerBI Modeling MCP"
         Description = "Power BI semantic model manipulation via Tabular Editor"
         Type = "executable"
-        RequiresPath = $true
-        PathPrompt = "Enter the path to your PowerBI Modeling MCP installation (auto-detected based on your Windows username)"
-        PathDefault = "$env:USERPROFILE\.vscode\extensions"
+        RequiresUsername = $true
+        UsernamePrompt = "Enter your Windows username (the only part that changes between environments)"
+        UsernameDefault = "$env:USERNAME"
+        PathTemplate = "C:\Users\{USERNAME}\.vscode\extensions"
         PathPattern = "analysis-services.powerbi-modeling-mcp-*-win32-x64"
         Config = @{
             command = "{PATH}\server\powerbi-modeling-mcp.exe"
@@ -1251,6 +1252,45 @@ function Get-UserSelections {
     return $selections
 }
 
+function Get-UsernamePathForMCP {
+    param(
+        [string]$ServerKey,
+        [hashtable]$ServerConfig
+    )
+
+    Write-Host ""
+    Write-Host "Configuration needed for: $($ServerConfig.Name)" -ForegroundColor $colors.Menu
+    Write-Host $ServerConfig.UsernamePrompt -ForegroundColor $colors.Info
+
+    # Get default username
+    $defaultUsername = $ExecutionContext.InvokeCommand.ExpandString($ServerConfig.UsernameDefault)
+
+    Write-Host "Default username: $defaultUsername" -ForegroundColor Gray
+    $username = Read-Host "Username (press Enter for default)"
+
+    if ([string]::IsNullOrWhiteSpace($username)) {
+        $username = $defaultUsername
+    }
+
+    # Build the path from template
+    $basePath = $ServerConfig.PathTemplate -replace '\{USERNAME\}', $username
+
+    # Try to auto-detect the full path with version pattern
+    if ($ServerConfig.PathPattern) {
+        $found = Get-ChildItem -Path $basePath -Filter $ServerConfig.PathPattern -Directory -ErrorAction SilentlyContinue |
+                 Sort-Object Name -Descending |
+                 Select-Object -First 1
+
+        if ($found) {
+            Write-Host "Auto-detected: $($found.FullName)" -ForegroundColor $colors.Success
+            return $found.FullName
+        }
+    }
+
+    Write-Host "Base path: $basePath" -ForegroundColor Gray
+    return $basePath
+}
+
 function Get-PathForMCP {
     param(
         [string]$ServerKey,
@@ -1262,19 +1302,6 @@ function Get-PathForMCP {
     Write-Host $ServerConfig.PathPrompt -ForegroundColor $colors.Info
 
     $defaultPath = $ExecutionContext.InvokeCommand.ExpandString($ServerConfig.PathDefault)
-
-    # Try to auto-detect path for PowerBI MCP
-    if ($ServerKey -eq "powerbi-modeling-mcp" -and $ServerConfig.PathPattern) {
-        $searchPath = $ExecutionContext.InvokeCommand.ExpandString($ServerConfig.PathDefault)
-        $found = Get-ChildItem -Path $searchPath -Filter $ServerConfig.PathPattern -Directory -ErrorAction SilentlyContinue |
-                 Sort-Object Name -Descending |
-                 Select-Object -First 1
-
-        if ($found) {
-            $defaultPath = $found.FullName
-            Write-Host "Auto-detected: $defaultPath" -ForegroundColor $colors.Success
-        }
-    }
 
     Write-Host "Default: $defaultPath" -ForegroundColor Gray
     $userPath = Read-Host "Path (press Enter for default)"
@@ -1341,6 +1368,23 @@ function Build-MCPConfig {
 
             $config.command = $server.Config.command
             $config.args = @($watchdogPath)
+        }
+        # Handle username-based path (e.g., PowerBI MCP)
+        elseif ($server.RequiresUsername) {
+            $path = Get-UsernamePathForMCP -ServerKey $serverKey -ServerConfig $server
+
+            # Validate path exists
+            if (-not (Test-Path $path)) {
+                Write-Warn "Path does not exist: $path"
+                $continue = Read-Host "Continue anyway? (y/n)"
+                if ($continue -ne 'y') {
+                    Write-Warn "Skipping $($server.Name)"
+                    continue
+                }
+            }
+
+            $config.command = $server.Config.command -replace '\{PATH\}', $path
+            $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
         }
         # Handle path substitution
         elseif ($server.RequiresPath) {
@@ -1884,6 +1928,79 @@ function Show-GUI {
 
                     $config.command = $server.Config.command
                     $config.args = @($watchdogPath)
+                }
+                # Handle username-based path (e.g., PowerBI MCP)
+                elseif ($server.RequiresUsername) {
+                    # Show username input dialog
+                    $userForm = New-Object System.Windows.Forms.Form
+                    $userForm.Text = "Configure $($server.Name)"
+                    $userForm.Size = New-Object System.Drawing.Size(500, 180)
+                    $userForm.StartPosition = "CenterParent"
+                    $userForm.BackColor = $primaryColor
+                    $userForm.ForeColor = $textColor
+                    $userForm.FormBorderStyle = "FixedDialog"
+                    $userForm.MaximizeBox = $false
+                    $userForm.MinimizeBox = $false
+
+                    $userLabel = New-Object System.Windows.Forms.Label
+                    $userLabel.Text = $server.UsernamePrompt
+                    $userLabel.Location = New-Object System.Drawing.Point(20, 20)
+                    $userLabel.Size = New-Object System.Drawing.Size(450, 40)
+                    $userForm.Controls.Add($userLabel)
+
+                    $userTextBox = New-Object System.Windows.Forms.TextBox
+                    $userTextBox.Size = New-Object System.Drawing.Size(440, 25)
+                    $userTextBox.Location = New-Object System.Drawing.Point(20, 65)
+                    $userTextBox.BackColor = $secondaryColor
+                    $userTextBox.ForeColor = $textColor
+                    $userTextBox.Text = $ExecutionContext.InvokeCommand.ExpandString($server.UsernameDefault)
+                    $userForm.Controls.Add($userTextBox)
+
+                    $userOkBtn = New-Object System.Windows.Forms.Button
+                    $userOkBtn.Text = "OK"
+                    $userOkBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $userOkBtn.Location = New-Object System.Drawing.Point(290, 105)
+                    $userOkBtn.BackColor = $successColor
+                    $userOkBtn.ForeColor = $secondaryColor
+                    $userOkBtn.FlatStyle = "Flat"
+                    $userOkBtn.DialogResult = [System.Windows.Forms.DialogResult]::OK
+                    $userForm.Controls.Add($userOkBtn)
+                    $userForm.AcceptButton = $userOkBtn
+
+                    $userSkipBtn = New-Object System.Windows.Forms.Button
+                    $userSkipBtn.Text = "Skip"
+                    $userSkipBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $userSkipBtn.Location = New-Object System.Drawing.Point(380, 105)
+                    $userSkipBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
+                    $userSkipBtn.ForeColor = $textColor
+                    $userSkipBtn.FlatStyle = "Flat"
+                    $userSkipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+                    $userForm.Controls.Add($userSkipBtn)
+
+                    $userResult = $userForm.ShowDialog()
+                    if ($userResult -eq [System.Windows.Forms.DialogResult]::OK) {
+                        $username = $userTextBox.Text
+                        $basePath = $server.PathTemplate -replace '\{USERNAME\}', $username
+
+                        # Try to auto-detect the full path with version pattern
+                        $path = $basePath
+                        if ($server.PathPattern) {
+                            $found = Get-ChildItem -Path $basePath -Filter $server.PathPattern -Directory -ErrorAction SilentlyContinue |
+                                     Sort-Object Name -Descending | Select-Object -First 1
+                            if ($found) {
+                                $path = $found.FullName
+                                Update-GuiLog "Auto-detected: $path"
+                            }
+                        }
+
+                        $config.command = $server.Config.command -replace '\{PATH\}', $path
+                        $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
+                    } else {
+                        Update-GuiLog "Skipped: $($server.Name)"
+                        $currentStep++
+                        $progressBar.Value = $currentStep
+                        continue
+                    }
                 }
                 # Handle path substitution
                 elseif ($server.RequiresPath) {
