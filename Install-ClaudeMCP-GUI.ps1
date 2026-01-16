@@ -348,17 +348,34 @@ function Update-ConfigurationPage {
     foreach ($serverKey in $SelectedServers) {
         $server = $MCPServers[$serverKey]
 
-        # Check if server requires configuration
-        if ($server.RequiresPath -or $server.RequiresApiKey) {
+        # Check if server requires configuration or has setup notes
+        if ($server.RequiresPath -or $server.RequiresApiKey -or $server.PreInstallNote) {
+            $panelHeight = 80
+            if ($server.PreInstallNote -and -not $server.RequiresPath -and -not $server.RequiresApiKey) {
+                $panelHeight = 120
+            }
+
             $configPanel = New-Object System.Windows.Forms.Panel
             $configPanel.Location = New-Object System.Drawing.Point(10, $yPos)
-            $configPanel.Size = New-Object System.Drawing.Size(540, 80)
+            $configPanel.Size = New-Object System.Drawing.Size(540, $panelHeight)
             $configPanel.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 54)
 
             # Server name
             $nameLabel = New-StyledLabel -Text $server.Name -FontSize 11 -FontStyle ([System.Drawing.FontStyle]::Bold)
             $nameLabel.Location = New-Object System.Drawing.Point(10, 8)
             $configPanel.Controls.Add($nameLabel)
+
+            # Show pre-install note if present (and no other config needed)
+            if ($server.PreInstallNote -and -not $server.RequiresPath -and -not $server.RequiresApiKey) {
+                $noteLabel = New-Object System.Windows.Forms.Label
+                $noteLabel.Text = $server.PreInstallNote.Trim()
+                $noteLabel.Location = New-Object System.Drawing.Point(10, 35)
+                $noteLabel.Size = New-Object System.Drawing.Size(520, 80)
+                $noteLabel.Font = New-Object System.Drawing.Font($script:GuiConfig.FontFamily, 8)
+                $noteLabel.ForeColor = $script:GuiConfig.WarningColor
+                $noteLabel.BackColor = [System.Drawing.Color]::Transparent
+                $configPanel.Controls.Add($noteLabel)
+            }
 
             if ($server.RequiresPath) {
                 $pathLabel = New-StyledLabel -Text "Path:" -FontSize 9
@@ -414,7 +431,7 @@ function Update-ConfigurationPage {
             }
 
             $scrollPanel.Controls.Add($configPanel)
-            $yPos += 90
+            $yPos += $panelHeight + 10
         }
     }
 
