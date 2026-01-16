@@ -10,6 +10,10 @@ This installer sets up Claude Code CLI and configures MCP (Model Context
 Protocol) servers for Claude Desktop. It handles all prerequisites and
 allows users to choose which MCP servers to install.
 
+NEW IN VERSION 2.0: Modern Windows Forms GUI with dark theme, visual
+component status indicators, checkbox-based server selection, and
+real-time progress tracking.
+
 REQUIREMENTS
 ------------
 - Windows 10/11

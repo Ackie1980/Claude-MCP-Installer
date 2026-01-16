@@ -576,9 +576,10 @@ $MCPServers = @{
         Name = "PowerBI Modeling MCP"
         Description = "Power BI semantic model manipulation via Tabular Editor"
         Type = "executable"
-        RequiresPath = $true
-        PathPrompt = "Enter the path to your PowerBI Modeling MCP installation"
-        PathDefault = "$env:USERPROFILE\.vscode\extensions"
+        RequiresUsername = $true
+        UsernamePrompt = "Enter your Windows username (the only part that changes between environments)"
+        UsernameDefault = "$env:USERNAME"
+        PathTemplate = "C:\Users\{USERNAME}\.vscode\extensions"
         PathPattern = "analysis-services.powerbi-modeling-mcp-*-win32-x64"
         Config = @{
             command = "{PATH}\server\powerbi-modeling-mcp.exe"
@@ -679,6 +680,107 @@ $MCPServers = @{
         Config = @{
             command = "py"
             args = @("{WATCHDOG_PATH}")
+        }
+    }
+    "netsuite" = @{
+        Name = "NetSuite MCP"
+        Description = "Oracle NetSuite ERP integration with SuiteQL and REST API access"
+        Type = "npx"
+        RequiresPath = $false
+        RequiresApiKey = $true
+        ApiKeyPrompt = "Enter your NetSuite Account ID (e.g., 1234567 or 1234567-sb1 for sandbox)"
+        ApiKeyHelp = @"
+
+  NetSuite MCP Setup - OAuth 2.0 Configuration Required:
+
+  Before using this MCP, you need to set up OAuth 2.0 in NetSuite:
+  1. Go to Setup > Integration > Manage Integrations > New
+  2. Enable 'Token-Based Authentication' and 'OAuth 2.0'
+  3. Set the callback URL to: http://localhost:9000/callback
+  4. Copy the Client ID and Client Secret
+  5. Set up a Role with appropriate permissions for API access
+
+  Environment variables needed (set in your system):
+  - NETSUITE_ACCOUNT_ID: Your account ID (entered above)
+  - NETSUITE_CLIENT_ID: OAuth 2.0 Client ID
+  - NETSUITE_CLIENT_SECRET: OAuth 2.0 Client Secret
+
+  For detailed setup: https://github.com/suiteinsider/netsuite-mcp
+
+"@
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@anthropic/mcp-server-netsuite")
+            env = @{
+                NETSUITE_ACCOUNT_ID = "{API_KEY}"
+            }
+        }
+    }
+    "google-drive" = @{
+        Name = "Google Drive MCP"
+        Description = "Google Drive, Docs, Sheets, and Slides integration"
+        Type = "npx"
+        RequiresPath = $true
+        PathPrompt = "Enter the path to your Google OAuth credentials JSON file"
+        PathDefault = "$env:USERPROFILE\.google\credentials.json"
+        PathHelp = @"
+
+  Google Drive MCP Setup - OAuth Credentials Required:
+
+  1. Go to Google Cloud Console (https://console.cloud.google.com)
+  2. Create a new project or select existing one
+  3. Enable the following APIs:
+     - Google Drive API
+     - Google Docs API
+     - Google Sheets API
+     - Google Slides API
+  4. Go to Credentials > Create Credentials > OAuth 2.0 Client ID
+  5. Select 'Desktop application' as the application type
+  6. Download the JSON credentials file
+  7. Save it to the path you enter above
+
+  On first run, the MCP will open a browser for authentication.
+
+"@
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@anthropic/mcp-server-gdrive")
+            env = @{
+                GDRIVE_CREDENTIALS_PATH = "{PATH}"
+            }
+        }
+    }
+    "google-cloud-storage" = @{
+        Name = "Google Cloud Storage MCP"
+        Description = "Manage Google Cloud Storage buckets and objects"
+        Type = "npx"
+        RequiresPath = $false
+        RequiresApiKey = $true
+        ApiKeyPrompt = "Enter your Google Cloud project ID"
+        ApiKeyHelp = @"
+
+  Google Cloud Storage MCP Setup:
+
+  Prerequisites:
+  1. Install Google Cloud SDK (gcloud CLI)
+  2. Run: gcloud auth application-default login
+  3. Your project ID can be found in Google Cloud Console
+
+  The MCP uses Application Default Credentials (ADC) for authentication.
+  Make sure you have the Storage Admin role or appropriate permissions.
+
+  For more info: https://www.npmjs.com/package/@google-cloud/storage-mcp
+
+"@
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@google-cloud/storage-mcp")
+            env = @{
+                GOOGLE_CLOUD_PROJECT = "{API_KEY}"
+            }
         }
     }
 }
@@ -1251,6 +1353,45 @@ function Get-UserSelections {
     return $selections
 }
 
+function Get-UsernamePathForMCP {
+    param(
+        [string]$ServerKey,
+        [hashtable]$ServerConfig
+    )
+
+    Write-Host ""
+    Write-Host "Configuration needed for: $($ServerConfig.Name)" -ForegroundColor $colors.Menu
+    Write-Host $ServerConfig.UsernamePrompt -ForegroundColor $colors.Info
+
+    # Get default username
+    $defaultUsername = $ExecutionContext.InvokeCommand.ExpandString($ServerConfig.UsernameDefault)
+
+    Write-Host "Default username: $defaultUsername" -ForegroundColor Gray
+    $username = Read-Host "Username (press Enter for default)"
+
+    if ([string]::IsNullOrWhiteSpace($username)) {
+        $username = $defaultUsername
+    }
+
+    # Build the path from template
+    $basePath = $ServerConfig.PathTemplate -replace '\{USERNAME\}', $username
+
+    # Try to auto-detect the full path with version pattern
+    if ($ServerConfig.PathPattern) {
+        $found = Get-ChildItem -Path $basePath -Filter $ServerConfig.PathPattern -Directory -ErrorAction SilentlyContinue |
+                 Sort-Object Name -Descending |
+                 Select-Object -First 1
+
+        if ($found) {
+            Write-Host "Auto-detected: $($found.FullName)" -ForegroundColor $colors.Success
+            return $found.FullName
+        }
+    }
+
+    Write-Host "Base path: $basePath" -ForegroundColor Gray
+    return $basePath
+}
+
 function Get-PathForMCP {
     param(
         [string]$ServerKey,
@@ -1262,19 +1403,6 @@ function Get-PathForMCP {
     Write-Host $ServerConfig.PathPrompt -ForegroundColor $colors.Info
 
     $defaultPath = $ExecutionContext.InvokeCommand.ExpandString($ServerConfig.PathDefault)
-
-    # Try to auto-detect path for PowerBI MCP
-    if ($ServerKey -eq "powerbi-modeling-mcp" -and $ServerConfig.PathPattern) {
-        $searchPath = $ExecutionContext.InvokeCommand.ExpandString($ServerConfig.PathDefault)
-        $found = Get-ChildItem -Path $searchPath -Filter $ServerConfig.PathPattern -Directory -ErrorAction SilentlyContinue |
-                 Sort-Object Name -Descending |
-                 Select-Object -First 1
-
-        if ($found) {
-            $defaultPath = $found.FullName
-            Write-Host "Auto-detected: $defaultPath" -ForegroundColor $colors.Success
-        }
-    }
 
     Write-Host "Default: $defaultPath" -ForegroundColor Gray
     $userPath = Read-Host "Path (press Enter for default)"
@@ -1331,7 +1459,8 @@ function Build-MCPConfig {
 
         # Handle embedded watchdog script
         if ($server.Type -eq "embedded-python") {
-            $watchdogPath = Install-WatchdogScript
+            # Capture only the return value, suppress any other output
+            $watchdogPath = (Install-WatchdogScript | Select-Object -Last 1)
 
             # Install required Python packages
             if ($server.PythonPackages) {
@@ -1340,6 +1469,24 @@ function Build-MCPConfig {
 
             $config.command = $server.Config.command
             $config.args = @($watchdogPath)
+        }
+        # Handle username-based path (e.g., PowerBI MCP)
+        elseif ($server.RequiresUsername) {
+            $path = Get-UsernamePathForMCP -ServerKey $serverKey -ServerConfig $server
+
+            # Validate path exists
+            if (-not (Test-Path $path)) {
+                Write-Warn "Path does not exist: $path"
+                $continue = Read-Host "Continue anyway? (y/n)"
+                if ($continue -ne 'y') {
+                    Write-Warn "Skipping $($server.Name)"
+                    continue
+                }
+            }
+
+            $config.command = $server.Config.command -replace '\{PATH\}', $path
+            # Wrap in @() to ensure single-element arrays remain arrays
+            $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
         }
         # Handle path substitution
         elseif ($server.RequiresPath) {
@@ -1356,10 +1503,12 @@ function Build-MCPConfig {
             }
 
             $config.command = $server.Config.command -replace '\{PATH\}', $path
-            $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
+            # Wrap in @() to ensure single-element arrays remain arrays
+            $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
         } else {
             $config.command = $server.Config.command
-            $config.args = $server.Config.args
+            # Ensure args remains an array for JSON serialization
+            $config.args = @($server.Config.args)
         }
 
         # Handle API key substitution
@@ -1409,14 +1558,35 @@ function Save-MCPConfig {
         Copy-Item $configPath $backupPath
         Write-Success "Backed up existing config to: $backupPath"
 
-        # Merge with existing config
+        # Merge with existing config (preserve existing MCPs, skip duplicates)
         try {
             $existingConfig = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
 
             if ($existingConfig.mcpServers) {
+                $skippedMcps = @()
+                $addedMcps = @()
+
                 foreach ($key in $Config.mcpServers.Keys) {
-                    $existingConfig.mcpServers[$key] = $Config.mcpServers[$key]
+                    if ($existingConfig.mcpServers.ContainsKey($key)) {
+                        # MCP already exists, skip it (don't overwrite)
+                        $skippedMcps += $key
+                    } else {
+                        # New MCP, add it to existing config
+                        $existingConfig.mcpServers[$key] = $Config.mcpServers[$key]
+                        $addedMcps += $key
+                    }
                 }
+
+                # Report skipped duplicates
+                if ($skippedMcps.Count -gt 0) {
+                    Write-Warn "Skipped existing MCPs (already configured): $($skippedMcps -join ', ')"
+                }
+
+                # Report added MCPs
+                if ($addedMcps.Count -gt 0) {
+                    Write-Success "Added new MCPs: $($addedMcps -join ', ')"
+                }
+
                 $Config = $existingConfig
             }
         } catch {
@@ -1431,12 +1601,825 @@ function Save-MCPConfig {
         }
     }
 
-    # Save config
+    # Save config (use UTF-8 without BOM to avoid JSON parsing errors)
     $jsonConfig = $Config | ConvertTo-Json -Depth 10
-    $jsonConfig | Out-File -FilePath $configPath -Encoding UTF8
+    [System.IO.File]::WriteAllText($configPath, $jsonConfig, [System.Text.UTF8Encoding]::new($false))
 
     Write-Success "Configuration saved to: $configPath"
     return $configPath
+}
+
+# ============================================================================
+# Windows Forms GUI
+# ============================================================================
+
+function Show-GUI {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    # Initialize logging
+    Initialize-Log
+    Write-Log "GUI mode started" "INFO"
+
+    # Define colors for the GUI
+    # Modern dark theme color palette
+    $primaryColor = [System.Drawing.Color]::FromArgb(28, 28, 32)
+    $secondaryColor = [System.Drawing.Color]::FromArgb(38, 38, 42)
+    $cardColor = [System.Drawing.Color]::FromArgb(48, 48, 54)
+    $accentColor = [System.Drawing.Color]::FromArgb(218, 119, 86)  # Claude orange
+    $accentHover = [System.Drawing.Color]::FromArgb(238, 139, 106)
+    $successColor = [System.Drawing.Color]::FromArgb(78, 201, 140)
+    $warningColor = [System.Drawing.Color]::FromArgb(255, 193, 77)
+    $errorColor = [System.Drawing.Color]::FromArgb(255, 99, 99)
+    $textColor = [System.Drawing.Color]::FromArgb(245, 245, 247)
+    $textMuted = [System.Drawing.Color]::FromArgb(150, 150, 158)
+    $borderColor = [System.Drawing.Color]::FromArgb(68, 68, 76)
+
+    # Create main form
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "Claude Code & MCP Servers Installer"
+    $form.Size = New-Object System.Drawing.Size(800, 700)
+    $form.StartPosition = "CenterScreen"
+    $form.BackColor = $primaryColor
+    $form.ForeColor = $textColor
+    $form.FormBorderStyle = "FixedSingle"
+    $form.MaximizeBox = $false
+    $form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+    # Header Panel with gradient effect
+    $headerPanel = New-Object System.Windows.Forms.Panel
+    $headerPanel.Size = New-Object System.Drawing.Size(800, 90)
+    $headerPanel.Location = New-Object System.Drawing.Point(0, 0)
+    $headerPanel.BackColor = $secondaryColor
+    $form.Controls.Add($headerPanel)
+
+    # Title - "Claude" in accent color
+    $titleClaude = New-Object System.Windows.Forms.Label
+    $titleClaude.Text = "Claude"
+    $titleClaude.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 22)
+    $titleClaude.ForeColor = $accentColor
+    $titleClaude.AutoSize = $true
+    $titleClaude.Location = New-Object System.Drawing.Point(25, 18)
+    $headerPanel.Controls.Add($titleClaude)
+
+    # Title - "MCP Server Installer" in white
+    $titleRest = New-Object System.Windows.Forms.Label
+    $titleRest.Text = "MCP Server Installer"
+    $titleRest.Font = New-Object System.Drawing.Font("Segoe UI Light", 22)
+    $titleRest.ForeColor = $textColor
+    $titleRest.AutoSize = $true
+    $titleRest.Location = New-Object System.Drawing.Point(130, 18)
+    $headerPanel.Controls.Add($titleRest)
+
+    # Subtitle Label
+    $subtitleLabel = New-Object System.Windows.Forms.Label
+    $subtitleLabel.Text = "Configure MCP servers for Claude Desktop"
+    $subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $subtitleLabel.ForeColor = $textMuted
+    $subtitleLabel.AutoSize = $true
+    $subtitleLabel.Location = New-Object System.Drawing.Point(27, 58)
+    $headerPanel.Controls.Add($subtitleLabel)
+
+    # Version Label with badge style
+    $versionLabel = New-Object System.Windows.Forms.Label
+    $versionLabel.Text = "v2.1.0"
+    $versionLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $versionLabel.ForeColor = $accentColor
+    $versionLabel.AutoSize = $true
+    $versionLabel.Location = New-Object System.Drawing.Point(720, 35)
+    $headerPanel.Controls.Add($versionLabel)
+
+    # ========================================
+    # Component Status Panel - Card Style
+    # ========================================
+    $statusPanel = New-Object System.Windows.Forms.Panel
+    $statusPanel.Size = New-Object System.Drawing.Size(750, 85)
+    $statusPanel.Location = New-Object System.Drawing.Point(20, 100)
+    $statusPanel.BackColor = $primaryColor
+    $form.Controls.Add($statusPanel)
+
+    # Component status cards
+    $componentLabels = @{}
+    $componentIcons = @{}
+    $componentCards = @{}
+    $components = @("Node.js", "Python", "UV", "Claude Code")
+    $xPos = 0
+    $cardWidth = 175
+
+    foreach ($comp in $components) {
+        # Card panel for each component
+        $card = New-Object System.Windows.Forms.Panel
+        $card.Size = New-Object System.Drawing.Size($cardWidth, 75)
+        $card.Location = New-Object System.Drawing.Point($xPos, 5)
+        $card.BackColor = $cardColor
+        $statusPanel.Controls.Add($card)
+        $componentCards[$comp] = $card
+
+        # Status icon (circle)
+        $icon = New-Object System.Windows.Forms.Label
+        $icon.Text = [char]0x25CF  # Circle bullet
+        $icon.Font = New-Object System.Drawing.Font("Segoe UI", 12)
+        $icon.ForeColor = $textMuted
+        $icon.AutoSize = $true
+        $icon.Location = New-Object System.Drawing.Point(12, 12)
+        $card.Controls.Add($icon)
+        $componentIcons[$comp] = $icon
+
+        # Component name
+        $label = New-Object System.Windows.Forms.Label
+        $label.Text = $comp
+        $label.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+        $label.ForeColor = $textColor
+        $label.AutoSize = $true
+        $label.Location = New-Object System.Drawing.Point(32, 10)
+        $card.Controls.Add($label)
+
+        # Version/status label
+        $statusLabel = New-Object System.Windows.Forms.Label
+        $statusLabel.Text = "Checking..."
+        $statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $statusLabel.ForeColor = $textMuted
+        $statusLabel.AutoSize = $true
+        $statusLabel.Location = New-Object System.Drawing.Point(12, 42)
+        $card.Controls.Add($statusLabel)
+        $componentLabels[$comp] = $statusLabel
+
+        $xPos += $cardWidth + 12
+    }
+
+    # ========================================
+    # MCP Servers Selection Panel
+    # ========================================
+    # Section title
+    $serversTitle = New-Object System.Windows.Forms.Label
+    $serversTitle.Text = "Select MCP Servers"
+    $serversTitle.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 11)
+    $serversTitle.ForeColor = $textColor
+    $serversTitle.AutoSize = $true
+    $serversTitle.Location = New-Object System.Drawing.Point(25, 195)
+    $form.Controls.Add($serversTitle)
+
+    # Create scrollable panel for server cards
+    $scrollPanel = New-Object System.Windows.Forms.Panel
+    $scrollPanel.Size = New-Object System.Drawing.Size(750, 265)
+    $scrollPanel.Location = New-Object System.Drawing.Point(20, 220)
+    $scrollPanel.AutoScroll = $true
+    $scrollPanel.BackColor = $primaryColor
+    $form.Controls.Add($scrollPanel)
+
+    # Create card-style items for each MCP server
+    $serverCheckboxes = @{}
+    $yPos = 0
+
+    foreach ($key in $MCPServers.Keys | Sort-Object) {
+        $server = $MCPServers[$key]
+
+        # Server item panel (card style)
+        $serverCard = New-Object System.Windows.Forms.Panel
+        $serverCard.Size = New-Object System.Drawing.Size(710, 65)
+        $serverCard.Location = New-Object System.Drawing.Point(5, $yPos)
+        $serverCard.BackColor = $cardColor
+        $scrollPanel.Controls.Add($serverCard)
+
+        # Checkbox
+        $checkbox = New-Object System.Windows.Forms.CheckBox
+        $checkbox.Text = ""
+        $checkbox.Size = New-Object System.Drawing.Size(20, 20)
+        $checkbox.Location = New-Object System.Drawing.Point(15, 22)
+        $checkbox.Tag = $key
+        $checkbox.Checked = $false
+        $checkbox.BackColor = $cardColor
+        $serverCard.Controls.Add($checkbox)
+        $serverCheckboxes[$key] = $checkbox
+
+        # Server name
+        $nameLabel = New-Object System.Windows.Forms.Label
+        $nameLabel.Text = $server.Name
+        $nameLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+        $nameLabel.ForeColor = $textColor
+        $nameLabel.AutoSize = $true
+        $nameLabel.Location = New-Object System.Drawing.Point(45, 12)
+        $serverCard.Controls.Add($nameLabel)
+
+        # Description
+        $descLabel = New-Object System.Windows.Forms.Label
+        $descLabel.Text = $server.Description
+        $descLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $descLabel.ForeColor = $textMuted
+        $descLabel.AutoSize = $true
+        $descLabel.Location = New-Object System.Drawing.Point(45, 34)
+        $serverCard.Controls.Add($descLabel)
+
+        # Prerequisites badge (right side)
+        if ($server.Prerequisites) {
+            $prereqLabel = New-Object System.Windows.Forms.Label
+            $prereqLabel.Text = $server.Prerequisites -join ", "
+            $prereqLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+            $prereqLabel.ForeColor = $warningColor
+            $prereqLabel.AutoSize = $true
+            $prereqLabel.Location = New-Object System.Drawing.Point(580, 22)
+            $prereqLabel.Tag = "prereq_$key"
+            $serverCard.Controls.Add($prereqLabel)
+        }
+
+        $yPos += 72
+    }
+
+    # Select All / Deselect All buttons (smaller, positioned inline)
+    $selectAllBtn = New-Object System.Windows.Forms.Button
+    $selectAllBtn.Text = "Select All"
+    $selectAllBtn.Size = New-Object System.Drawing.Size(90, 28)
+    $selectAllBtn.Location = New-Object System.Drawing.Point(25, 490)
+    $selectAllBtn.BackColor = $cardColor
+    $selectAllBtn.ForeColor = $textColor
+    $selectAllBtn.FlatStyle = "Flat"
+    $selectAllBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $selectAllBtn.FlatAppearance.BorderColor = $borderColor
+    $selectAllBtn.FlatAppearance.BorderSize = 1
+    $selectAllBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $selectAllBtn.Add_Click({
+        foreach ($cb in $serverCheckboxes.Values) {
+            if ($cb.Enabled) { $cb.Checked = $true }
+        }
+    })
+    $form.Controls.Add($selectAllBtn)
+
+    $deselectAllBtn = New-Object System.Windows.Forms.Button
+    $deselectAllBtn.Text = "Deselect All"
+    $deselectAllBtn.Size = New-Object System.Drawing.Size(90, 28)
+    $deselectAllBtn.Location = New-Object System.Drawing.Point(125, 490)
+    $deselectAllBtn.BackColor = $cardColor
+    $deselectAllBtn.ForeColor = $textMuted
+    $deselectAllBtn.FlatStyle = "Flat"
+    $deselectAllBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $deselectAllBtn.FlatAppearance.BorderColor = $borderColor
+    $deselectAllBtn.FlatAppearance.BorderSize = 1
+    $deselectAllBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $deselectAllBtn.Add_Click({
+        foreach ($cb in $serverCheckboxes.Values) {
+            $cb.Checked = $false
+        }
+    })
+    $form.Controls.Add($deselectAllBtn)
+
+    # ========================================
+    # Progress Section
+    # ========================================
+    $progressPanel = New-Object System.Windows.Forms.Panel
+    $progressPanel.Size = New-Object System.Drawing.Size(750, 100)
+    $progressPanel.Location = New-Object System.Drawing.Point(20, 528)
+    $progressPanel.BackColor = $cardColor
+    $form.Controls.Add($progressPanel)
+
+    # Status text
+    $statusText = New-Object System.Windows.Forms.Label
+    $statusText.Text = "Ready to install"
+    $statusText.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $statusText.ForeColor = $textColor
+    $statusText.Size = New-Object System.Drawing.Size(720, 22)
+    $statusText.Location = New-Object System.Drawing.Point(15, 12)
+    $progressPanel.Controls.Add($statusText)
+
+    # Progress bar (styled)
+    $progressBar = New-Object System.Windows.Forms.ProgressBar
+    $progressBar.Size = New-Object System.Drawing.Size(720, 8)
+    $progressBar.Location = New-Object System.Drawing.Point(15, 40)
+    $progressBar.Style = "Continuous"
+    $progressPanel.Controls.Add($progressBar)
+
+    # Log textbox
+    $logTextBox = New-Object System.Windows.Forms.TextBox
+    $logTextBox.Multiline = $true
+    $logTextBox.ScrollBars = "Vertical"
+    $logTextBox.ReadOnly = $true
+    $logTextBox.BackColor = $secondaryColor
+    $logTextBox.ForeColor = $textMuted
+    $logTextBox.Font = New-Object System.Drawing.Font("Cascadia Code", 8)
+    $logTextBox.Size = New-Object System.Drawing.Size(720, 40)
+    $logTextBox.Location = New-Object System.Drawing.Point(15, 55)
+    $logTextBox.BorderStyle = "None"
+    $progressPanel.Controls.Add($logTextBox)
+
+    # ========================================
+    # Action Buttons
+    # ========================================
+    $installBtn = New-Object System.Windows.Forms.Button
+    $installBtn.Text = "Install Selected"
+    $installBtn.Size = New-Object System.Drawing.Size(150, 42)
+    $installBtn.Location = New-Object System.Drawing.Point(500, 640)
+    $installBtn.BackColor = $accentColor
+    $installBtn.ForeColor = $textColor
+    $installBtn.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+    $installBtn.FlatStyle = "Flat"
+    $installBtn.FlatAppearance.BorderSize = 0
+    $installBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $form.Controls.Add($installBtn)
+
+    $cancelBtn = New-Object System.Windows.Forms.Button
+    $cancelBtn.Text = "Cancel"
+    $cancelBtn.Size = New-Object System.Drawing.Size(100, 42)
+    $cancelBtn.Location = New-Object System.Drawing.Point(660, 640)
+    $cancelBtn.BackColor = $cardColor
+    $cancelBtn.ForeColor = $textMuted
+    $cancelBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $cancelBtn.FlatStyle = "Flat"
+    $cancelBtn.FlatAppearance.BorderColor = $borderColor
+    $cancelBtn.FlatAppearance.BorderSize = 1
+    $cancelBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $cancelBtn.Add_Click({ $form.Close() })
+    $form.Controls.Add($cancelBtn)
+
+    # ========================================
+    # Helper function to update log
+    # ========================================
+    $script:GuiLogMessages = @()
+
+    function Update-GuiLog {
+        param([string]$Message, [string]$Level = "INFO")
+        $timestamp = Get-Date -Format "HH:mm:ss"
+        $logEntry = "[$timestamp] $Message"
+        $script:GuiLogMessages += $logEntry
+        $logTextBox.Text = ($script:GuiLogMessages | Select-Object -Last 10) -join "`r`n"
+        $logTextBox.SelectionStart = $logTextBox.Text.Length
+        $logTextBox.ScrollToCaret()
+        $statusText.Text = $Message
+        Write-Log $Message $Level
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+
+    # ========================================
+    # Check components on load
+    # ========================================
+    $form.Add_Shown({
+        Update-GuiLog "Checking system components..."
+
+        # Check Node.js
+        $nodeVersion = Get-NodeVersion
+        if ($nodeVersion) {
+            $script:InstalledComponents.NodeJS = $true
+            $componentIcons["Node.js"].ForeColor = $successColor
+            $componentLabels["Node.js"].Text = $nodeVersion
+            $componentLabels["Node.js"].ForeColor = $successColor
+        } else {
+            $componentIcons["Node.js"].ForeColor = $errorColor
+            $componentLabels["Node.js"].Text = "Not installed"
+            $componentLabels["Node.js"].ForeColor = $errorColor
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Check Python
+        $pythonVersion = Get-PythonVersion
+        if ($pythonVersion) {
+            $script:InstalledComponents.Python = $true
+            $componentIcons["Python"].ForeColor = $successColor
+            $componentLabels["Python"].Text = $pythonVersion
+            $componentLabels["Python"].ForeColor = $successColor
+        } else {
+            $componentIcons["Python"].ForeColor = $errorColor
+            $componentLabels["Python"].Text = "Not installed"
+            $componentLabels["Python"].ForeColor = $errorColor
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Check UV
+        $uvVersion = Get-UVVersion
+        if ($uvVersion) {
+            $script:InstalledComponents.UV = $true
+            $componentIcons["UV"].ForeColor = $successColor
+            $componentLabels["UV"].Text = $uvVersion
+            $componentLabels["UV"].ForeColor = $successColor
+        } else {
+            $componentIcons["UV"].ForeColor = $errorColor
+            $componentLabels["UV"].Text = "Not installed"
+            $componentLabels["UV"].ForeColor = $errorColor
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Check Claude Code
+        $claudeVersion = Get-ClaudeVersion
+        if ($claudeVersion) {
+            $script:InstalledComponents.ClaudeCode = $true
+            $componentIcons["Claude Code"].ForeColor = $successColor
+            $componentLabels["Claude Code"].Text = $claudeVersion
+            $componentLabels["Claude Code"].ForeColor = $successColor
+        } else {
+            $componentIcons["Claude Code"].ForeColor = $warningColor
+            $componentLabels["Claude Code"].Text = "Not installed"
+            $componentLabels["Claude Code"].ForeColor = $warningColor
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Update checkbox states based on prerequisites
+        foreach ($key in $MCPServers.Keys) {
+            $server = $MCPServers[$key]
+            $canInstall = $true
+            $missingPrereqs = @()
+
+            if ($server.Prerequisites) {
+                foreach ($prereq in $server.Prerequisites) {
+                    switch ($prereq) {
+                        "nodejs" {
+                            if (-not $script:InstalledComponents.NodeJS) {
+                                $canInstall = $false
+                                $missingPrereqs += "Node.js"
+                            }
+                        }
+                        "python" {
+                            if (-not $script:InstalledComponents.Python) {
+                                $canInstall = $false
+                                $missingPrereqs += "Python"
+                            }
+                        }
+                        "uv" {
+                            if (-not $script:InstalledComponents.UV) {
+                                $canInstall = $false
+                                $missingPrereqs += "UV"
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (-not $canInstall) {
+                $serverCheckboxes[$key].Enabled = $false
+                $serverCheckboxes[$key].ForeColor = $textMuted
+            }
+        }
+
+        Update-GuiLog "Component check complete. Ready to install."
+    })
+
+    # ========================================
+    # Install button click handler
+    # ========================================
+    $installBtn.Add_Click({
+        # Get selected servers
+        $selectedServers = @()
+        foreach ($key in $serverCheckboxes.Keys) {
+            if ($serverCheckboxes[$key].Checked) {
+                $selectedServers += $key
+            }
+        }
+
+        if ($selectedServers.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Please select at least one MCP server to install.",
+                "No Selection",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            )
+            return
+        }
+
+        # Disable controls during installation
+        $installBtn.Enabled = $false
+        $selectAllBtn.Enabled = $false
+        $deselectAllBtn.Enabled = $false
+        foreach ($cb in $serverCheckboxes.Values) {
+            $cb.Enabled = $false
+        }
+
+        $progressBar.Value = 0
+        $progressBar.Maximum = $selectedServers.Count * 2  # 2 steps per server
+
+        Update-GuiLog "Starting installation of $($selectedServers.Count) server(s)..."
+
+        $configuredServers = @{
+            mcpServers = @{}
+        }
+        $currentStep = 0
+
+        foreach ($serverKey in $selectedServers) {
+            $server = $MCPServers[$serverKey]
+            Update-GuiLog "Configuring: $($server.Name)..."
+            $currentStep++
+            $progressBar.Value = $currentStep
+
+            try {
+                $config = @{}
+
+                # Handle embedded watchdog script
+                if ($server.Type -eq "embedded-python") {
+                    Update-GuiLog "Installing watchdog script..."
+                    # Capture only the return value, suppress any other output
+                    $watchdogPath = (Install-WatchdogScript | Select-Object -Last 1)
+
+                    if ($server.PythonPackages) {
+                        Update-GuiLog "Installing Python packages..."
+                        $null = Install-PythonPackages -Packages $server.PythonPackages
+                    }
+
+                    $config.command = $server.Config.command
+                    $config.args = @($watchdogPath)
+                }
+                # Handle username-based path (e.g., PowerBI MCP)
+                elseif ($server.RequiresUsername) {
+                    # Show username input dialog
+                    $userForm = New-Object System.Windows.Forms.Form
+                    $userForm.Text = "Configure $($server.Name)"
+                    $userForm.Size = New-Object System.Drawing.Size(500, 180)
+                    $userForm.StartPosition = "CenterParent"
+                    $userForm.BackColor = $primaryColor
+                    $userForm.ForeColor = $textColor
+                    $userForm.FormBorderStyle = "FixedDialog"
+                    $userForm.MaximizeBox = $false
+                    $userForm.MinimizeBox = $false
+
+                    $userLabel = New-Object System.Windows.Forms.Label
+                    $userLabel.Text = $server.UsernamePrompt
+                    $userLabel.Location = New-Object System.Drawing.Point(20, 20)
+                    $userLabel.Size = New-Object System.Drawing.Size(450, 40)
+                    $userForm.Controls.Add($userLabel)
+
+                    $userTextBox = New-Object System.Windows.Forms.TextBox
+                    $userTextBox.Size = New-Object System.Drawing.Size(440, 25)
+                    $userTextBox.Location = New-Object System.Drawing.Point(20, 65)
+                    $userTextBox.BackColor = $secondaryColor
+                    $userTextBox.ForeColor = $textColor
+                    $userTextBox.Text = $ExecutionContext.InvokeCommand.ExpandString($server.UsernameDefault)
+                    $userForm.Controls.Add($userTextBox)
+
+                    $userOkBtn = New-Object System.Windows.Forms.Button
+                    $userOkBtn.Text = "OK"
+                    $userOkBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $userOkBtn.Location = New-Object System.Drawing.Point(290, 105)
+                    $userOkBtn.BackColor = $successColor
+                    $userOkBtn.ForeColor = $secondaryColor
+                    $userOkBtn.FlatStyle = "Flat"
+                    $userOkBtn.DialogResult = [System.Windows.Forms.DialogResult]::OK
+                    $userForm.Controls.Add($userOkBtn)
+                    $userForm.AcceptButton = $userOkBtn
+
+                    $userSkipBtn = New-Object System.Windows.Forms.Button
+                    $userSkipBtn.Text = "Skip"
+                    $userSkipBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $userSkipBtn.Location = New-Object System.Drawing.Point(380, 105)
+                    $userSkipBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
+                    $userSkipBtn.ForeColor = $textColor
+                    $userSkipBtn.FlatStyle = "Flat"
+                    $userSkipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+                    $userForm.Controls.Add($userSkipBtn)
+
+                    $userResult = $userForm.ShowDialog()
+                    if ($userResult -eq [System.Windows.Forms.DialogResult]::OK) {
+                        $username = $userTextBox.Text
+                        $basePath = $server.PathTemplate -replace '\{USERNAME\}', $username
+
+                        # Try to auto-detect the full path with version pattern
+                        $path = $basePath
+                        if ($server.PathPattern) {
+                            $found = Get-ChildItem -Path $basePath -Filter $server.PathPattern -Directory -ErrorAction SilentlyContinue |
+                                     Sort-Object Name -Descending | Select-Object -First 1
+                            if ($found) {
+                                $path = $found.FullName
+                                Update-GuiLog "Auto-detected: $path"
+                            }
+                        }
+
+                        $config.command = $server.Config.command -replace '\{PATH\}', $path
+                        $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
+                    } else {
+                        Update-GuiLog "Skipped: $($server.Name)"
+                        $currentStep++
+                        $progressBar.Value = $currentStep
+                        continue
+                    }
+                }
+                # Handle path substitution
+                elseif ($server.RequiresPath) {
+                    # Show path input dialog
+                    $pathForm = New-Object System.Windows.Forms.Form
+                    $pathForm.Text = "Configure $($server.Name)"
+                    $pathForm.Size = New-Object System.Drawing.Size(600, 200)
+                    $pathForm.StartPosition = "CenterParent"
+                    $pathForm.BackColor = $primaryColor
+                    $pathForm.ForeColor = $textColor
+                    $pathForm.FormBorderStyle = "FixedDialog"
+                    $pathForm.MaximizeBox = $false
+                    $pathForm.MinimizeBox = $false
+
+                    $pathLabel = New-Object System.Windows.Forms.Label
+                    $pathLabel.Text = $server.PathPrompt
+                    $pathLabel.Location = New-Object System.Drawing.Point(20, 20)
+                    $pathLabel.Size = New-Object System.Drawing.Size(550, 40)
+                    $pathForm.Controls.Add($pathLabel)
+
+                    $pathTextBox = New-Object System.Windows.Forms.TextBox
+                    $pathTextBox.Size = New-Object System.Drawing.Size(450, 25)
+                    $pathTextBox.Location = New-Object System.Drawing.Point(20, 70)
+                    $pathTextBox.BackColor = $secondaryColor
+                    $pathTextBox.ForeColor = $textColor
+
+                    # Try auto-detect
+                    $defaultPath = $ExecutionContext.InvokeCommand.ExpandString($server.PathDefault)
+                    if ($server.PathPattern) {
+                        $found = Get-ChildItem -Path $defaultPath -Filter $server.PathPattern -Directory -ErrorAction SilentlyContinue |
+                                 Sort-Object Name -Descending | Select-Object -First 1
+                        if ($found) {
+                            $pathTextBox.Text = $found.FullName
+                        } else {
+                            $pathTextBox.Text = $defaultPath
+                        }
+                    } else {
+                        $pathTextBox.Text = $defaultPath
+                    }
+                    $pathForm.Controls.Add($pathTextBox)
+
+                    $browseBtn = New-Object System.Windows.Forms.Button
+                    $browseBtn.Text = "Browse..."
+                    $browseBtn.Size = New-Object System.Drawing.Size(80, 25)
+                    $browseBtn.Location = New-Object System.Drawing.Point(480, 70)
+                    $browseBtn.BackColor = $accentColor
+                    $browseBtn.ForeColor = $textColor
+                    $browseBtn.FlatStyle = "Flat"
+                    $browseBtn.Add_Click({
+                        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+                        $folderBrowser.Description = "Select the installation folder"
+                        if ($folderBrowser.ShowDialog() -eq "OK") {
+                            $pathTextBox.Text = $folderBrowser.SelectedPath
+                        }
+                    })
+                    $pathForm.Controls.Add($browseBtn)
+
+                    $okBtn = New-Object System.Windows.Forms.Button
+                    $okBtn.Text = "OK"
+                    $okBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $okBtn.Location = New-Object System.Drawing.Point(400, 120)
+                    $okBtn.BackColor = $successColor
+                    $okBtn.ForeColor = $secondaryColor
+                    $okBtn.FlatStyle = "Flat"
+                    $okBtn.DialogResult = [System.Windows.Forms.DialogResult]::OK
+                    $pathForm.Controls.Add($okBtn)
+                    $pathForm.AcceptButton = $okBtn
+
+                    $skipBtn = New-Object System.Windows.Forms.Button
+                    $skipBtn.Text = "Skip"
+                    $skipBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $skipBtn.Location = New-Object System.Drawing.Point(490, 120)
+                    $skipBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
+                    $skipBtn.ForeColor = $textColor
+                    $skipBtn.FlatStyle = "Flat"
+                    $skipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+                    $pathForm.Controls.Add($skipBtn)
+
+                    $result = $pathForm.ShowDialog()
+                    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                        $path = $pathTextBox.Text
+                        $config.command = $server.Config.command -replace '\{PATH\}', $path
+                        $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
+                    } else {
+                        Update-GuiLog "Skipped: $($server.Name)"
+                        $currentStep++
+                        $progressBar.Value = $currentStep
+                        continue
+                    }
+                } else {
+                    $config.command = $server.Config.command
+                    $config.args = @($server.Config.args)
+                }
+
+                # Handle API key substitution
+                if ($server.RequiresApiKey) {
+                    $apiForm = New-Object System.Windows.Forms.Form
+                    $apiForm.Text = "API Key for $($server.Name)"
+                    $apiForm.Size = New-Object System.Drawing.Size(500, 250)
+                    $apiForm.StartPosition = "CenterParent"
+                    $apiForm.BackColor = $primaryColor
+                    $apiForm.ForeColor = $textColor
+                    $apiForm.FormBorderStyle = "FixedDialog"
+                    $apiForm.MaximizeBox = $false
+                    $apiForm.MinimizeBox = $false
+
+                    $apiLabel = New-Object System.Windows.Forms.Label
+                    $apiLabel.Text = $server.ApiKeyPrompt
+                    $apiLabel.Location = New-Object System.Drawing.Point(20, 20)
+                    $apiLabel.AutoSize = $true
+                    $apiForm.Controls.Add($apiLabel)
+
+                    if ($server.ApiKeyHelp) {
+                        $helpLabel = New-Object System.Windows.Forms.Label
+                        $helpLabel.Text = $server.ApiKeyHelp
+                        $helpLabel.Location = New-Object System.Drawing.Point(20, 50)
+                        $helpLabel.Size = New-Object System.Drawing.Size(450, 80)
+                        $helpLabel.ForeColor = $textMuted
+                        $apiForm.Controls.Add($helpLabel)
+                    }
+
+                    $apiTextBox = New-Object System.Windows.Forms.TextBox
+                    $apiTextBox.Size = New-Object System.Drawing.Size(440, 25)
+                    $apiTextBox.Location = New-Object System.Drawing.Point(20, 140)
+                    $apiTextBox.BackColor = $secondaryColor
+                    $apiTextBox.ForeColor = $textColor
+                    $apiTextBox.UseSystemPasswordChar = $true
+                    $apiForm.Controls.Add($apiTextBox)
+
+                    $apiOkBtn = New-Object System.Windows.Forms.Button
+                    $apiOkBtn.Text = "OK"
+                    $apiOkBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $apiOkBtn.Location = New-Object System.Drawing.Point(290, 175)
+                    $apiOkBtn.BackColor = $successColor
+                    $apiOkBtn.ForeColor = $secondaryColor
+                    $apiOkBtn.FlatStyle = "Flat"
+                    $apiOkBtn.DialogResult = [System.Windows.Forms.DialogResult]::OK
+                    $apiForm.Controls.Add($apiOkBtn)
+                    $apiForm.AcceptButton = $apiOkBtn
+
+                    $apiSkipBtn = New-Object System.Windows.Forms.Button
+                    $apiSkipBtn.Text = "Skip"
+                    $apiSkipBtn.Size = New-Object System.Drawing.Size(80, 30)
+                    $apiSkipBtn.Location = New-Object System.Drawing.Point(380, 175)
+                    $apiSkipBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
+                    $apiSkipBtn.ForeColor = $textColor
+                    $apiSkipBtn.FlatStyle = "Flat"
+                    $apiSkipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+                    $apiForm.Controls.Add($apiSkipBtn)
+
+                    $apiResult = $apiForm.ShowDialog()
+                    if ($apiResult -eq [System.Windows.Forms.DialogResult]::OK -and -not [string]::IsNullOrWhiteSpace($apiTextBox.Text)) {
+                        $apiKey = $apiTextBox.Text
+                        if ($server.Config.env) {
+                            $config.env = @{}
+                            foreach ($envKey in $server.Config.env.Keys) {
+                                $config.env[$envKey] = $server.Config.env[$envKey] -replace '\{API_KEY\}', $apiKey
+                            }
+                        }
+                    } else {
+                        Update-GuiLog "Skipped: $($server.Name) (no API key)"
+                        $currentStep++
+                        $progressBar.Value = $currentStep
+                        continue
+                    }
+                } elseif ($server.Config.env) {
+                    $config.env = $server.Config.env
+                }
+
+                $configuredServers.mcpServers[$serverKey] = $config
+                Update-GuiLog "Configured: $($server.Name)"
+
+            } catch {
+                Update-GuiLog "Error configuring $($server.Name): $_"
+                Write-Log "Error: $_" "ERROR"
+            }
+
+            $currentStep++
+            $progressBar.Value = $currentStep
+        }
+
+        # Save configuration
+        if ($configuredServers.mcpServers.Count -gt 0) {
+            Update-GuiLog "Saving configuration..."
+            try {
+                $configPath = Save-MCPConfig -Config $configuredServers
+                $progressBar.Value = $progressBar.Maximum
+                Update-GuiLog "Installation complete!"
+
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Installation completed successfully!`n`nConfiguration saved to:`n$configPath`n`nPlease restart Claude Desktop to load the new MCP servers.",
+                    "Installation Complete",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Information
+                )
+            } catch {
+                Update-GuiLog "Error saving configuration: $_"
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Error saving configuration:`n$_",
+                    "Error",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Error
+                )
+            }
+        } else {
+            Update-GuiLog "No servers were configured."
+            [System.Windows.Forms.MessageBox]::Show(
+                "No MCP servers were configured.",
+                "Warning",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            )
+        }
+
+        # Re-enable controls
+        $installBtn.Enabled = $true
+        $selectAllBtn.Enabled = $true
+        $deselectAllBtn.Enabled = $true
+        foreach ($key in $serverCheckboxes.Keys) {
+            $server = $MCPServers[$key]
+            $canInstall = $true
+            if ($server.Prerequisites) {
+                foreach ($prereq in $server.Prerequisites) {
+                    switch ($prereq) {
+                        "nodejs" { if (-not $script:InstalledComponents.NodeJS) { $canInstall = $false } }
+                        "python" { if (-not $script:InstalledComponents.Python) { $canInstall = $false } }
+                        "uv" { if (-not $script:InstalledComponents.UV) { $canInstall = $false } }
+                    }
+                }
+            }
+            $serverCheckboxes[$key].Enabled = $canInstall
+        }
+    })
+
+    # Show the form
+    [void]$form.ShowDialog()
 }
 
 # ============================================================================
