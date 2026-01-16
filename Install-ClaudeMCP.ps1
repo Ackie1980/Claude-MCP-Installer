@@ -2076,7 +2076,7 @@ function Show-GUI {
                         }
 
                         $config.command = $server.Config.command -replace '\{PATH\}', $path
-                        $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
+                        $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
                     } else {
                         Update-GuiLog "Skipped: $($server.Name)"
                         $currentStep++
@@ -2165,7 +2165,7 @@ function Show-GUI {
                     if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
                         $path = $pathTextBox.Text
                         $config.command = $server.Config.command -replace '\{PATH\}', $path
-                        $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
+                        $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
                     } else {
                         Update-GuiLog "Skipped: $($server.Name)"
                         $currentStep++
@@ -2174,7 +2174,7 @@ function Show-GUI {
                     }
                 } else {
                     $config.command = $server.Config.command
-                    $config.args = $server.Config.args
+                    $config.args = @($server.Config.args)
                 }
 
                 # Handle API key substitution
