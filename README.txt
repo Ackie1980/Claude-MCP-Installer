@@ -65,16 +65,23 @@ Method 1: Double-click the batch file (Recommended)
   - Check the MCP servers you want to install
   - Click "Install Selected"
 
-Method 2: Run PowerShell directly
+Method 2: GUI Wizard (Alternative)
+  - Double-click "Install-ClaudeMCP-GUI.bat"
+  - Follow the step-by-step wizard interface
+  - Modern visual interface with progress tracking
+
+Method 3: Console mode (text-based menu)
+  - Run: .\Install-ClaudeMCP.ps1 -Console
+  - Follow the on-screen instructions in terminal
+
+Method 4: Run PowerShell directly
   - Open PowerShell
   - Navigate to this folder
   - Run: .\Install-ClaudeMCP.ps1
 
-Method 3: Console mode (text-based menu)
-  - Run: .\Install-ClaudeMCP.ps1 -Console
-
-Method 4: With parameters
+Method 5: With parameters
   - Skip prerequisites check: .\Install-ClaudeMCP.ps1 -SkipPrerequisites -Console
+  - GUI version: .\Install-ClaudeMCP-GUI.ps1
 
 WHAT THE INSTALLER DOES
 -----------------------
