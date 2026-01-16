@@ -811,6 +811,60 @@ $MCPServers = @{
             args = @("-y", "@pnp/cli-microsoft365-mcp-server@latest")
         }
     }
+    "notion" = @{
+        Name = "Notion MCP"
+        Description = "Official Notion MCP Server - Access and manage Notion workspaces, pages, databases and blocks"
+        Type = "npx"
+        RequiresPath = $false
+        RequiresApiKey = $true
+        ApiKeyUrl = "https://www.notion.so/profile/integrations"
+        Prerequisites = @("nodejs")
+        PreInstallNote = @"
+
+  Notion MCP Server - Setup Required:
+
+  1. Create a Notion integration at https://www.notion.so/profile/integrations
+  2. Copy the Internal Integration Secret (starts with 'ntn_' or 'secret_')
+  3. Share the pages/databases you want to access with your integration
+
+  For more info: https://developers.notion.com/docs/mcp
+
+"@
+        Config = @{
+            command = "npx"
+            args = @("-y", "@notionhq/notion-mcp-server")
+            env = @{
+                NOTION_TOKEN = "{API_KEY}"
+            }
+        }
+    }
+    "airtable" = @{
+        Name = "Airtable MCP"
+        Description = "Airtable MCP Server - Read and write to Airtable bases, tables and records"
+        Type = "npx"
+        RequiresPath = $false
+        RequiresApiKey = $true
+        ApiKeyUrl = "https://airtable.com/create/tokens"
+        Prerequisites = @("nodejs")
+        PreInstallNote = @"
+
+  Airtable MCP Server - Setup Required:
+
+  1. Create a Personal Access Token at https://airtable.com/create/tokens
+  2. Grant scopes: schema.bases:read, data.records:read (and write scopes if needed)
+  3. Select the bases you want to access
+
+  For more info: https://github.com/domdomegg/airtable-mcp-server
+
+"@
+        Config = @{
+            command = "npx"
+            args = @("-y", "airtable-mcp-server")
+            env = @{
+                AIRTABLE_API_KEY = "{API_KEY}"
+            }
+        }
+    }
 }
 
 # ============================================================================
