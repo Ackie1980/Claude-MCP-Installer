@@ -2190,7 +2190,6 @@ function Show-GUI {
                     # Show path input dialog
                     $pathForm = New-Object System.Windows.Forms.Form
                     $pathForm.Text = "Configure $($server.Name)"
-                    $pathForm.Size = New-Object System.Drawing.Size(600, 200)
                     $pathForm.StartPosition = "CenterParent"
                     $pathForm.BackColor = $primaryColor
                     $pathForm.ForeColor = $textColor
@@ -2201,14 +2200,33 @@ function Show-GUI {
                     $pathLabel = New-Object System.Windows.Forms.Label
                     $pathLabel.Text = $server.PathPrompt
                     $pathLabel.Location = New-Object System.Drawing.Point(20, 20)
-                    $pathLabel.Size = New-Object System.Drawing.Size(550, 40)
+                    $pathLabel.Size = New-Object System.Drawing.Size(540, 20)
+                    $pathLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
                     $pathForm.Controls.Add($pathLabel)
+
+                    $inputYPos = 50
+                    if ($server.PathHelp) {
+                        $helpBox = New-Object System.Windows.Forms.TextBox
+                        $helpBox.Text = $server.PathHelp.Trim()
+                        $helpBox.Location = New-Object System.Drawing.Point(20, 50)
+                        $helpBox.Size = New-Object System.Drawing.Size(540, 120)
+                        $helpBox.Multiline = $true
+                        $helpBox.ReadOnly = $true
+                        $helpBox.ScrollBars = "Vertical"
+                        $helpBox.BackColor = $secondaryColor
+                        $helpBox.ForeColor = $textMuted
+                        $helpBox.BorderStyle = "FixedSingle"
+                        $helpBox.Font = New-Object System.Drawing.Font("Consolas", 9)
+                        $pathForm.Controls.Add($helpBox)
+                        $inputYPos = 185
+                    }
 
                     $pathTextBox = New-Object System.Windows.Forms.TextBox
                     $pathTextBox.Size = New-Object System.Drawing.Size(450, 25)
-                    $pathTextBox.Location = New-Object System.Drawing.Point(20, 70)
+                    $pathTextBox.Location = New-Object System.Drawing.Point(20, $inputYPos)
                     $pathTextBox.BackColor = $secondaryColor
                     $pathTextBox.ForeColor = $textColor
+                    $pathTextBox.BorderStyle = "FixedSingle"
 
                     # Try auto-detect
                     $defaultPath = $ExecutionContext.InvokeCommand.ExpandString($server.PathDefault)
@@ -2228,23 +2246,35 @@ function Show-GUI {
                     $browseBtn = New-Object System.Windows.Forms.Button
                     $browseBtn.Text = "Browse..."
                     $browseBtn.Size = New-Object System.Drawing.Size(80, 25)
-                    $browseBtn.Location = New-Object System.Drawing.Point(480, 70)
+                    $browseBtn.Location = New-Object System.Drawing.Point(480, $inputYPos)
                     $browseBtn.BackColor = $accentColor
                     $browseBtn.ForeColor = $textColor
                     $browseBtn.FlatStyle = "Flat"
+                    # Determine if we need file or folder browser based on path extension
+                    $isFilePath = $defaultPath -match '\.\w+$'
                     $browseBtn.Add_Click({
-                        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-                        $folderBrowser.Description = "Select the installation folder"
-                        if ($folderBrowser.ShowDialog() -eq "OK") {
-                            $pathTextBox.Text = $folderBrowser.SelectedPath
+                        if ($isFilePath) {
+                            $fileBrowser = New-Object System.Windows.Forms.OpenFileDialog
+                            $fileBrowser.Title = "Select the file"
+                            $fileBrowser.Filter = "All Files (*.*)|*.*|JSON Files (*.json)|*.json"
+                            if ($fileBrowser.ShowDialog() -eq "OK") {
+                                $pathTextBox.Text = $fileBrowser.FileName
+                            }
+                        } else {
+                            $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+                            $folderBrowser.Description = "Select the installation folder"
+                            if ($folderBrowser.ShowDialog() -eq "OK") {
+                                $pathTextBox.Text = $folderBrowser.SelectedPath
+                            }
                         }
-                    })
+                    }.GetNewClosure())
                     $pathForm.Controls.Add($browseBtn)
 
+                    $btnYPos = $inputYPos + 40
                     $okBtn = New-Object System.Windows.Forms.Button
                     $okBtn.Text = "OK"
                     $okBtn.Size = New-Object System.Drawing.Size(80, 30)
-                    $okBtn.Location = New-Object System.Drawing.Point(400, 120)
+                    $okBtn.Location = New-Object System.Drawing.Point(390, $btnYPos)
                     $okBtn.BackColor = $successColor
                     $okBtn.ForeColor = $secondaryColor
                     $okBtn.FlatStyle = "Flat"
@@ -2255,18 +2285,29 @@ function Show-GUI {
                     $skipBtn = New-Object System.Windows.Forms.Button
                     $skipBtn.Text = "Skip"
                     $skipBtn.Size = New-Object System.Drawing.Size(80, 30)
-                    $skipBtn.Location = New-Object System.Drawing.Point(490, 120)
+                    $skipBtn.Location = New-Object System.Drawing.Point(480, $btnYPos)
                     $skipBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
                     $skipBtn.ForeColor = $textColor
                     $skipBtn.FlatStyle = "Flat"
                     $skipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
                     $pathForm.Controls.Add($skipBtn)
 
+                    # Set form size based on content
+                    $formHeight = $btnYPos + 80
+                    $pathForm.Size = New-Object System.Drawing.Size(600, $formHeight)
+
                     $result = $pathForm.ShowDialog()
                     if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
                         $path = $pathTextBox.Text
                         $config.command = $server.Config.command -replace '\{PATH\}', $path
                         $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
+                        # Handle env path substitution
+                        if ($server.Config.env) {
+                            $config.env = @{}
+                            foreach ($envKey in $server.Config.env.Keys) {
+                                $config.env[$envKey] = $server.Config.env[$envKey] -replace '\{PATH\}', $path
+                            }
+                        }
                     } else {
                         Update-GuiLog "Skipped: $($server.Name)"
                         $currentStep++
@@ -2282,7 +2323,6 @@ function Show-GUI {
                 if ($server.RequiresApiKey) {
                     $apiForm = New-Object System.Windows.Forms.Form
                     $apiForm.Text = "API Key for $($server.Name)"
-                    $apiForm.Size = New-Object System.Drawing.Size(500, 250)
                     $apiForm.StartPosition = "CenterParent"
                     $apiForm.BackColor = $primaryColor
                     $apiForm.ForeColor = $textColor
@@ -2293,30 +2333,40 @@ function Show-GUI {
                     $apiLabel = New-Object System.Windows.Forms.Label
                     $apiLabel.Text = $server.ApiKeyPrompt
                     $apiLabel.Location = New-Object System.Drawing.Point(20, 20)
-                    $apiLabel.AutoSize = $true
+                    $apiLabel.Size = New-Object System.Drawing.Size(540, 20)
+                    $apiLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
                     $apiForm.Controls.Add($apiLabel)
 
+                    $inputYPos = 50
                     if ($server.ApiKeyHelp) {
-                        $helpLabel = New-Object System.Windows.Forms.Label
-                        $helpLabel.Text = $server.ApiKeyHelp
-                        $helpLabel.Location = New-Object System.Drawing.Point(20, 50)
-                        $helpLabel.Size = New-Object System.Drawing.Size(450, 80)
-                        $helpLabel.ForeColor = $textMuted
-                        $apiForm.Controls.Add($helpLabel)
+                        $helpBox = New-Object System.Windows.Forms.TextBox
+                        $helpBox.Text = $server.ApiKeyHelp.Trim()
+                        $helpBox.Location = New-Object System.Drawing.Point(20, 50)
+                        $helpBox.Size = New-Object System.Drawing.Size(540, 120)
+                        $helpBox.Multiline = $true
+                        $helpBox.ReadOnly = $true
+                        $helpBox.ScrollBars = "Vertical"
+                        $helpBox.BackColor = $secondaryColor
+                        $helpBox.ForeColor = $textMuted
+                        $helpBox.BorderStyle = "FixedSingle"
+                        $helpBox.Font = New-Object System.Drawing.Font("Consolas", 9)
+                        $apiForm.Controls.Add($helpBox)
+                        $inputYPos = 185
                     }
 
                     $apiTextBox = New-Object System.Windows.Forms.TextBox
-                    $apiTextBox.Size = New-Object System.Drawing.Size(440, 25)
-                    $apiTextBox.Location = New-Object System.Drawing.Point(20, 140)
+                    $apiTextBox.Size = New-Object System.Drawing.Size(540, 25)
+                    $apiTextBox.Location = New-Object System.Drawing.Point(20, $inputYPos)
                     $apiTextBox.BackColor = $secondaryColor
                     $apiTextBox.ForeColor = $textColor
-                    $apiTextBox.UseSystemPasswordChar = $true
+                    $apiTextBox.BorderStyle = "FixedSingle"
                     $apiForm.Controls.Add($apiTextBox)
 
+                    $btnYPos = $inputYPos + 40
                     $apiOkBtn = New-Object System.Windows.Forms.Button
                     $apiOkBtn.Text = "OK"
                     $apiOkBtn.Size = New-Object System.Drawing.Size(80, 30)
-                    $apiOkBtn.Location = New-Object System.Drawing.Point(290, 175)
+                    $apiOkBtn.Location = New-Object System.Drawing.Point(390, $btnYPos)
                     $apiOkBtn.BackColor = $successColor
                     $apiOkBtn.ForeColor = $secondaryColor
                     $apiOkBtn.FlatStyle = "Flat"
@@ -2327,12 +2377,16 @@ function Show-GUI {
                     $apiSkipBtn = New-Object System.Windows.Forms.Button
                     $apiSkipBtn.Text = "Skip"
                     $apiSkipBtn.Size = New-Object System.Drawing.Size(80, 30)
-                    $apiSkipBtn.Location = New-Object System.Drawing.Point(380, 175)
+                    $apiSkipBtn.Location = New-Object System.Drawing.Point(480, $btnYPos)
                     $apiSkipBtn.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
                     $apiSkipBtn.ForeColor = $textColor
                     $apiSkipBtn.FlatStyle = "Flat"
                     $apiSkipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
                     $apiForm.Controls.Add($apiSkipBtn)
+
+                    # Set form size based on content
+                    $formHeight = $btnYPos + 80
+                    $apiForm.Size = New-Object System.Drawing.Size(600, $formHeight)
 
                     $apiResult = $apiForm.ShowDialog()
                     if ($apiResult -eq [System.Windows.Forms.DialogResult]::OK -and -not [string]::IsNullOrWhiteSpace($apiTextBox.Text)) {
