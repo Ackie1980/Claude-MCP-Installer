@@ -682,6 +682,107 @@ $MCPServers = @{
             args = @("{WATCHDOG_PATH}")
         }
     }
+    "netsuite" = @{
+        Name = "NetSuite MCP"
+        Description = "Oracle NetSuite ERP integration with SuiteQL and REST API access"
+        Type = "npx"
+        RequiresPath = $false
+        RequiresApiKey = $true
+        ApiKeyPrompt = "Enter your NetSuite Account ID (e.g., 1234567 or 1234567-sb1 for sandbox)"
+        ApiKeyHelp = @"
+
+  NetSuite MCP Setup - OAuth 2.0 Configuration Required:
+
+  Before using this MCP, you need to set up OAuth 2.0 in NetSuite:
+  1. Go to Setup > Integration > Manage Integrations > New
+  2. Enable 'Token-Based Authentication' and 'OAuth 2.0'
+  3. Set the callback URL to: http://localhost:9000/callback
+  4. Copy the Client ID and Client Secret
+  5. Set up a Role with appropriate permissions for API access
+
+  Environment variables needed (set in your system):
+  - NETSUITE_ACCOUNT_ID: Your account ID (entered above)
+  - NETSUITE_CLIENT_ID: OAuth 2.0 Client ID
+  - NETSUITE_CLIENT_SECRET: OAuth 2.0 Client Secret
+
+  For detailed setup: https://github.com/suiteinsider/netsuite-mcp
+
+"@
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@anthropic/mcp-server-netsuite")
+            env = @{
+                NETSUITE_ACCOUNT_ID = "{API_KEY}"
+            }
+        }
+    }
+    "google-drive" = @{
+        Name = "Google Drive MCP"
+        Description = "Google Drive, Docs, Sheets, and Slides integration"
+        Type = "npx"
+        RequiresPath = $true
+        PathPrompt = "Enter the path to your Google OAuth credentials JSON file"
+        PathDefault = "$env:USERPROFILE\.google\credentials.json"
+        PathHelp = @"
+
+  Google Drive MCP Setup - OAuth Credentials Required:
+
+  1. Go to Google Cloud Console (https://console.cloud.google.com)
+  2. Create a new project or select existing one
+  3. Enable the following APIs:
+     - Google Drive API
+     - Google Docs API
+     - Google Sheets API
+     - Google Slides API
+  4. Go to Credentials > Create Credentials > OAuth 2.0 Client ID
+  5. Select 'Desktop application' as the application type
+  6. Download the JSON credentials file
+  7. Save it to the path you enter above
+
+  On first run, the MCP will open a browser for authentication.
+
+"@
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@anthropic/mcp-server-gdrive")
+            env = @{
+                GDRIVE_CREDENTIALS_PATH = "{PATH}"
+            }
+        }
+    }
+    "google-cloud-storage" = @{
+        Name = "Google Cloud Storage MCP"
+        Description = "Manage Google Cloud Storage buckets and objects"
+        Type = "npx"
+        RequiresPath = $false
+        RequiresApiKey = $true
+        ApiKeyPrompt = "Enter your Google Cloud project ID"
+        ApiKeyHelp = @"
+
+  Google Cloud Storage MCP Setup:
+
+  Prerequisites:
+  1. Install Google Cloud SDK (gcloud CLI)
+  2. Run: gcloud auth application-default login
+  3. Your project ID can be found in Google Cloud Console
+
+  The MCP uses Application Default Credentials (ADC) for authentication.
+  Make sure you have the Storage Admin role or appropriate permissions.
+
+  For more info: https://www.npmjs.com/package/@google-cloud/storage-mcp
+
+"@
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@google-cloud/storage-mcp")
+            env = @{
+                GOOGLE_CLOUD_PROJECT = "{API_KEY}"
+            }
+        }
+    }
 }
 
 # ============================================================================
