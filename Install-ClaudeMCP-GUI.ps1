@@ -19,6 +19,31 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 . "$scriptPath\Install-ClaudeMCP.ps1" -NoRun
 
 # ============================================================================
+# Wrapper Functions for Prerequisite Checks
+# ============================================================================
+# These wrap the Get-*Version functions from the main script
+
+function Test-NodeJS {
+    $version = Get-NodeVersion
+    return ($null -ne $version)
+}
+
+function Test-Python {
+    $version = Get-PythonVersion
+    return ($null -ne $version)
+}
+
+function Test-UV {
+    $version = Get-UVVersion
+    return ($null -ne $version)
+}
+
+function Test-ClaudeCode {
+    $version = Get-ClaudeVersion
+    return ($null -ne $version)
+}
+
+# ============================================================================
 # GUI Configuration
 # ============================================================================
 
@@ -130,14 +155,14 @@ Welcome to the Claude MCP Installer!
 
 This wizard will help you:
 
-    • Install Claude Code CLI (command-line interface)
-    • Configure MCP (Model Context Protocol) servers
-    • Set up integrations for Microsoft 365, Excel, PowerBI, and more
+    - Install Claude Code CLI (command-line interface)
+    - Configure MCP (Model Context Protocol) servers
+    - Set up integrations for Microsoft 365, Excel, PowerBI, and more
 
 Before you begin:
-    • Ensure you have an internet connection
-    • Close Claude Desktop if it's running
-    • Some components may require administrator privileges
+    - Ensure you have an internet connection
+    - Close Claude Desktop if it's running
+    - Some components may require administrator privileges
 
 Click 'Next' to check prerequisites and begin the installation.
 "@
