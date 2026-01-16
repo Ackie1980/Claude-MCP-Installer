@@ -682,6 +682,20 @@ $MCPServers = @{
             args = @("{WATCHDOG_PATH}")
         }
     }
+    "qbd-systems-memory" = @{
+        Name = "QBD Systems Memory"
+        Description = "Persistent memory for QBD systems environment context"
+        Type = "npx"
+        RequiresPath = $false
+        Prerequisites = @("nodejs")
+        Config = @{
+            command = "npx"
+            args = @("-y", "@modelcontextprotocol/server-memory")
+            env = @{
+                MEMORY_FILE_PATH = "{USERPROFILE}\.qbd-systems\memory.json"
+            }
+        }
+    }
 }
 
 # ============================================================================
@@ -1423,7 +1437,10 @@ function Build-MCPConfig {
                 }
             }
         } elseif ($server.Config.env) {
-            $config.env = $server.Config.env
+            $config.env = @{}
+            foreach ($envKey in $server.Config.env.Keys) {
+                $config.env[$envKey] = $server.Config.env[$envKey] -replace '\{USERPROFILE\}', $env:USERPROFILE
+            }
         }
 
         $mcpConfig.mcpServers[$serverKey] = $config
@@ -2225,7 +2242,10 @@ function Show-GUI {
                         continue
                     }
                 } elseif ($server.Config.env) {
-                    $config.env = $server.Config.env
+                    $config.env = @{}
+                    foreach ($envKey in $server.Config.env.Keys) {
+                        $config.env[$envKey] = $server.Config.env[$envKey] -replace '\{USERPROFILE\}', $env:USERPROFILE
+                    }
                 }
 
                 $configuredServers.mcpServers[$serverKey] = $config

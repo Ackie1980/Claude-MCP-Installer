@@ -57,6 +57,12 @@ AVAILABLE MCP SERVERS
 9. HubSpot MCP
    - HubSpot CRM integration (requires separate marketplace installation)
 
+10. QBD Systems Memory
+    - Persistent memory for QBD systems environment context
+    - Stores information about company systems, workflows, and context
+    - Memory file stored at: %USERPROFILE%\.qbd-systems\memory.json
+    - Requires: Node.js
+
 HOW TO USE
 ----------
 Method 1: Double-click the batch file (Recommended)
