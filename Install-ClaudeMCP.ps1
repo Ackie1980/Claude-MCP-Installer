@@ -581,6 +581,7 @@ $MCPServers = @{
         UsernameDefault = "$env:USERNAME"
         PathTemplate = "C:\Users\{USERNAME}\.vscode\extensions"
         PathPattern = "analysis-services.powerbi-modeling-mcp-*-win32-x64"
+        Prerequisites = @()
         Config = @{
             command = "{PATH}\server\powerbi-modeling-mcp.exe"
             args = @("--start")
