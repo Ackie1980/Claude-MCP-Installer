@@ -1216,8 +1216,27 @@ function Install-UV {
 
         # Try alternative installation via PowerShell
         Write-Step "Trying alternative UV installation..."
-        Write-Log "Executing: Invoke-RestMethod https://astral.sh/uv/install.ps1" "DEBUG"
-        Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+        try {
+            Write-Log "Downloading UV installer from https://astral.sh/uv/install.ps1" "DEBUG"
+            $uvInstallScript = Invoke-RestMethod -Uri "https://astral.sh/uv/install.ps1" -ErrorAction Stop
+
+            if ($uvInstallScript) {
+                Write-Log "Executing UV installer script" "DEBUG"
+                # Save to temp file and execute to avoid RemoteException with Invoke-Expression
+                $tempScript = Join-Path $env:TEMP "uv_install_$(Get-Random).ps1"
+                $uvInstallScript | Out-File -FilePath $tempScript -Encoding UTF8 -Force
+                try {
+                    & $tempScript
+                } finally {
+                    if (Test-Path $tempScript) {
+                        Remove-Item $tempScript -Force -ErrorAction SilentlyContinue
+                    }
+                }
+            }
+        } catch {
+            Write-Log "Alternative UV installation failed: $_" "WARN"
+        }
+
         Refresh-Path
         Start-Sleep -Seconds 2
 
