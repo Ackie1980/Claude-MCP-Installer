@@ -1552,17 +1552,69 @@ function Save-MCPConfig {
         New-Item -ItemType Directory -Path $configDir -Force | Out-Null
     }
 
-    # Backup existing config if present
+    # Backup existing config if present and try to merge
     if (Test-Path $configPath) {
         $backupPath = "$configPath.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         Copy-Item $configPath $backupPath
         Write-Success "Backed up existing config to: $backupPath"
 
-        # Merge with existing config (preserve existing MCPs, skip duplicates)
-        try {
-            $existingConfig = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
+        # Read the existing config file
+        $existingJson = Get-Content $configPath -Raw -ErrorAction SilentlyContinue
 
-            if ($existingConfig.mcpServers) {
+        if ($existingJson) {
+            $existingConfig = $null
+            $parseError = $null
+
+            # Try parsing with -AsHashtable first (PowerShell 6+)
+            try {
+                $existingConfig = $existingJson | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            } catch {
+                $parseError = $_
+            }
+
+            # Fallback: Parse as PSObject and convert to hashtable manually (PowerShell 5.1)
+            if (-not $existingConfig) {
+                try {
+                    $jsonObj = $existingJson | ConvertFrom-Json -ErrorAction Stop
+                    $existingConfig = @{}
+
+                    # Convert mcpServers
+                    if ($jsonObj.mcpServers) {
+                        $existingConfig.mcpServers = @{}
+                        foreach ($prop in $jsonObj.mcpServers.PSObject.Properties) {
+                            $serverConfig = @{}
+                            foreach ($serverProp in $prop.Value.PSObject.Properties) {
+                                if ($serverProp.Name -eq 'args' -and $serverProp.Value -is [array]) {
+                                    $serverConfig[$serverProp.Name] = @($serverProp.Value)
+                                } elseif ($serverProp.Name -eq 'env' -and $serverProp.Value) {
+                                    $serverConfig[$serverProp.Name] = @{}
+                                    foreach ($envProp in $serverProp.Value.PSObject.Properties) {
+                                        $serverConfig[$serverProp.Name][$envProp.Name] = $envProp.Value
+                                    }
+                                } else {
+                                    $serverConfig[$serverProp.Name] = $serverProp.Value
+                                }
+                            }
+                            $existingConfig.mcpServers[$prop.Name] = $serverConfig
+                        }
+                    }
+
+                    # Convert preferences
+                    if ($jsonObj.preferences) {
+                        $existingConfig.preferences = @{}
+                        foreach ($prop in $jsonObj.preferences.PSObject.Properties) {
+                            $existingConfig.preferences[$prop.Name] = $prop.Value
+                        }
+                    }
+
+                    $parseError = $null
+                } catch {
+                    $parseError = $_
+                }
+            }
+
+            # Merge if we successfully parsed the existing config
+            if ($existingConfig -and $existingConfig.mcpServers) {
                 $skippedMcps = @()
                 $addedMcps = @()
 
@@ -1588,9 +1640,10 @@ function Save-MCPConfig {
                 }
 
                 $Config = $existingConfig
+            } elseif ($parseError) {
+                Write-Warn "Could not parse existing config: $($parseError.Exception.Message)"
+                Write-Warn "Creating new config. Your backup is at: $backupPath"
             }
-        } catch {
-            Write-Warn "Could not parse existing config, creating new one"
         }
     }
 
