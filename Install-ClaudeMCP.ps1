@@ -1384,7 +1384,8 @@ function Build-MCPConfig {
             }
 
             $config.command = $server.Config.command -replace '\{PATH\}', $path
-            $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
+            # Wrap in @() to ensure single-element arrays remain arrays
+            $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
         }
         # Handle path substitution
         elseif ($server.RequiresPath) {
@@ -1401,10 +1402,12 @@ function Build-MCPConfig {
             }
 
             $config.command = $server.Config.command -replace '\{PATH\}', $path
-            $config.args = $server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path }
+            # Wrap in @() to ensure single-element arrays remain arrays
+            $config.args = @($server.Config.args | ForEach-Object { $_ -replace '\{PATH\}', $path })
         } else {
             $config.command = $server.Config.command
-            $config.args = $server.Config.args
+            # Ensure args remains an array for JSON serialization
+            $config.args = @($server.Config.args)
         }
 
         # Handle API key substitution
@@ -1476,9 +1479,9 @@ function Save-MCPConfig {
         }
     }
 
-    # Save config
+    # Save config (use UTF-8 without BOM to avoid JSON parsing errors)
     $jsonConfig = $Config | ConvertTo-Json -Depth 10
-    $jsonConfig | Out-File -FilePath $configPath -Encoding UTF8
+    [System.IO.File]::WriteAllText($configPath, $jsonConfig, [System.Text.UTF8Encoding]::new($false))
 
     Write-Success "Configuration saved to: $configPath"
     return $configPath
