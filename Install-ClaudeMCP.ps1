@@ -1454,14 +1454,35 @@ function Save-MCPConfig {
         Copy-Item $configPath $backupPath
         Write-Success "Backed up existing config to: $backupPath"
 
-        # Merge with existing config
+        # Merge with existing config (preserve existing MCPs, skip duplicates)
         try {
             $existingConfig = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
 
             if ($existingConfig.mcpServers) {
+                $skippedMcps = @()
+                $addedMcps = @()
+
                 foreach ($key in $Config.mcpServers.Keys) {
-                    $existingConfig.mcpServers[$key] = $Config.mcpServers[$key]
+                    if ($existingConfig.mcpServers.ContainsKey($key)) {
+                        # MCP already exists, skip it (don't overwrite)
+                        $skippedMcps += $key
+                    } else {
+                        # New MCP, add it to existing config
+                        $existingConfig.mcpServers[$key] = $Config.mcpServers[$key]
+                        $addedMcps += $key
+                    }
                 }
+
+                # Report skipped duplicates
+                if ($skippedMcps.Count -gt 0) {
+                    Write-Warn "Skipped existing MCPs (already configured): $($skippedMcps -join ', ')"
+                }
+
+                # Report added MCPs
+                if ($addedMcps.Count -gt 0) {
+                    Write-Success "Added new MCPs: $($addedMcps -join ', ')"
+                }
+
                 $Config = $existingConfig
             }
         } catch {
