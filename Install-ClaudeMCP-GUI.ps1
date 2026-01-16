@@ -5,7 +5,7 @@
     A Windows Forms GUI wizard for installing Claude Code CLI and configuring MCP servers.
 .NOTES
     Version: 2.0.0
-    Author: Quality By Design NV
+    Author: Ackie
 #>
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -174,7 +174,7 @@ Click 'Next' to check prerequisites and begin the installation.
     $panel.Controls.Add($desc)
 
     # Author
-    $author = New-StyledLabel -Text "By Quality By Design NV" -FontSize 9 -ForeColor ([System.Drawing.Color]::Gray)
+    $author = New-StyledLabel -Text "By Ackie" -FontSize 9 -ForeColor ([System.Drawing.Color]::Gray)
     $author.Location = New-Object System.Drawing.Point(50, 420)
     $panel.Controls.Add($author)
 
