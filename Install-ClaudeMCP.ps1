@@ -14,7 +14,7 @@
 param(
     [switch]$SkipPrerequisites,
     [switch]$Unattended,
-    [switch]$Console
+    [switch]$NoRun  # Used when dot-sourcing to import functions without running Main
 )
 
 # ============================================================================
@@ -2576,11 +2576,7 @@ function Main {
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
-# Run the installer
-if ($Console) {
-    # Console mode - use text-based menu
+# Run the installer (unless -NoRun is specified for importing functions only)
+if (-not $NoRun) {
     Main
-} else {
-    # GUI mode (default)
-    Show-GUI
 }
