@@ -19,6 +19,31 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 . "$scriptPath\Install-ClaudeMCP.ps1" -NoRun
 
 # ============================================================================
+# Wrapper Functions for Prerequisite Checks
+# ============================================================================
+# These wrap the Get-*Version functions from the main script
+
+function Test-NodeJS {
+    $version = Get-NodeVersion
+    return ($null -ne $version)
+}
+
+function Test-Python {
+    $version = Get-PythonVersion
+    return ($null -ne $version)
+}
+
+function Test-UV {
+    $version = Get-UVVersion
+    return ($null -ne $version)
+}
+
+function Test-ClaudeCode {
+    $version = Get-ClaudeVersion
+    return ($null -ne $version)
+}
+
+# ============================================================================
 # GUI Configuration
 # ============================================================================
 
@@ -130,14 +155,14 @@ Welcome to the Claude MCP Installer!
 
 This wizard will help you:
 
-    • Install Claude Code CLI (command-line interface)
-    • Configure MCP (Model Context Protocol) servers
-    • Set up integrations for Microsoft 365, Excel, PowerBI, and more
+    - Install Claude Code CLI (command-line interface)
+    - Configure MCP (Model Context Protocol) servers
+    - Set up integrations for Microsoft 365, Excel, PowerBI, and more
 
 Before you begin:
-    • Ensure you have an internet connection
-    • Close Claude Desktop if it's running
-    • Some components may require administrator privileges
+    - Ensure you have an internet connection
+    - Close Claude Desktop if it's running
+    - Some components may require administrator privileges
 
 Click 'Next' to check prerequisites and begin the installation.
 "@
@@ -350,9 +375,15 @@ function Update-ConfigurationPage {
 
         # Check if server requires configuration or has setup notes
         if ($server.RequiresPath -or $server.RequiresApiKey -or $server.PreInstallNote) {
-            $panelHeight = 80
-            if ($server.PreInstallNote -and -not $server.RequiresPath -and -not $server.RequiresApiKey) {
-                $panelHeight = 120
+            # Calculate panel height based on content
+            $panelHeight = 35  # Base height for title
+            $contentYPos = 35  # Y position for content after title
+
+            if ($server.PreInstallNote) {
+                $panelHeight += 100  # Add space for pre-install note
+            }
+            if ($server.RequiresPath -or $server.RequiresApiKey) {
+                $panelHeight += 45  # Add space for input field
             }
 
             $configPanel = New-Object System.Windows.Forms.Panel
@@ -365,25 +396,26 @@ function Update-ConfigurationPage {
             $nameLabel.Location = New-Object System.Drawing.Point(10, 8)
             $configPanel.Controls.Add($nameLabel)
 
-            # Show pre-install note if present (and no other config needed)
-            if ($server.PreInstallNote -and -not $server.RequiresPath -and -not $server.RequiresApiKey) {
+            # Show pre-install note if present
+            if ($server.PreInstallNote) {
                 $noteLabel = New-Object System.Windows.Forms.Label
                 $noteLabel.Text = $server.PreInstallNote.Trim()
-                $noteLabel.Location = New-Object System.Drawing.Point(10, 35)
-                $noteLabel.Size = New-Object System.Drawing.Size(520, 80)
+                $noteLabel.Location = New-Object System.Drawing.Point(10, $contentYPos)
+                $noteLabel.Size = New-Object System.Drawing.Size(520, 90)
                 $noteLabel.Font = New-Object System.Drawing.Font($script:GuiConfig.FontFamily, 8)
                 $noteLabel.ForeColor = $script:GuiConfig.WarningColor
                 $noteLabel.BackColor = [System.Drawing.Color]::Transparent
                 $configPanel.Controls.Add($noteLabel)
+                $contentYPos += 95  # Move down for any subsequent controls
             }
 
             if ($server.RequiresPath) {
                 $pathLabel = New-StyledLabel -Text "Path:" -FontSize 9
-                $pathLabel.Location = New-Object System.Drawing.Point(10, 35)
+                $pathLabel.Location = New-Object System.Drawing.Point(10, $contentYPos)
                 $configPanel.Controls.Add($pathLabel)
 
                 $pathBox = New-Object System.Windows.Forms.TextBox
-                $pathBox.Location = New-Object System.Drawing.Point(50, 32)
+                $pathBox.Location = New-Object System.Drawing.Point(50, ($contentYPos - 3))
                 $pathBox.Size = New-Object System.Drawing.Size(400, 25)
                 $pathBox.Font = New-Object System.Drawing.Font($script:GuiConfig.FontFamily, 9)
                 $pathBox.Name = "path_$serverKey"
@@ -391,7 +423,7 @@ function Update-ConfigurationPage {
                 $configPanel.Controls.Add($pathBox)
 
                 $browseBtn = New-StyledButton -Text "..." -Width 30 -Height 25 -BackColor $script:GuiConfig.SecondaryColor
-                $browseBtn.Location = New-Object System.Drawing.Point(455, 32)
+                $browseBtn.Location = New-Object System.Drawing.Point(455, ($contentYPos - 3))
                 $browseBtn.Tag = "path_$serverKey"
                 $browseBtn.Add_Click({
                     $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -405,11 +437,11 @@ function Update-ConfigurationPage {
 
             if ($server.RequiresApiKey) {
                 $apiLabel = New-StyledLabel -Text "API Key:" -FontSize 9
-                $apiLabel.Location = New-Object System.Drawing.Point(10, 35)
+                $apiLabel.Location = New-Object System.Drawing.Point(10, $contentYPos)
                 $configPanel.Controls.Add($apiLabel)
 
                 $apiBox = New-Object System.Windows.Forms.TextBox
-                $apiBox.Location = New-Object System.Drawing.Point(70, 32)
+                $apiBox.Location = New-Object System.Drawing.Point(70, ($contentYPos - 3))
                 $apiBox.Size = New-Object System.Drawing.Size(380, 25)
                 $apiBox.Font = New-Object System.Drawing.Font($script:GuiConfig.FontFamily, 9)
                 $apiBox.Name = "apikey_$serverKey"
@@ -419,7 +451,7 @@ function Update-ConfigurationPage {
                 if ($server.ApiKeyUrl) {
                     $linkLabel = New-Object System.Windows.Forms.LinkLabel
                     $linkLabel.Text = "Get API Key"
-                    $linkLabel.Location = New-Object System.Drawing.Point(455, 35)
+                    $linkLabel.Location = New-Object System.Drawing.Point(455, $contentYPos)
                     $linkLabel.AutoSize = $true
                     $linkLabel.LinkColor = $script:GuiConfig.AccentColor
                     $linkLabel.Tag = $server.ApiKeyUrl
