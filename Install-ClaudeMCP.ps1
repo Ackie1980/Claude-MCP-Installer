@@ -5,7 +5,7 @@
 # Claude Desktop. It handles all prerequisites and lets users choose
 # which MCP servers to install.
 #
-# Author: Quality By Design NV
+# Author: Ackie
 # Version: 2.0.0
 # ============================================================================
 

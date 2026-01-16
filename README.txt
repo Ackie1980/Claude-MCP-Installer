@@ -1,8 +1,8 @@
 ============================================================================
 Claude Code & MCP Servers Installer
 ============================================================================
-Version: 2.0.0
-Author: Quality By Design NV
+Version: 2.1.0
+Author: Ackie
 
 DESCRIPTION
 -----------
@@ -10,9 +10,18 @@ This installer sets up Claude Code CLI and configures MCP (Model Context
 Protocol) servers for Claude Desktop. It handles all prerequisites and
 allows users to choose which MCP servers to install.
 
-NEW IN VERSION 2.0: Modern Windows Forms GUI with dark theme, visual
-component status indicators, checkbox-based server selection, and
-real-time progress tracking.
+NEW IN VERSION 2.1: Added Notion and Airtable MCP servers, improved GUI
+configuration panel layout, and fixed encoding issues.
+
+QUICK INSTALL FROM GITHUB
+-------------------------
+Run this one-liner in PowerShell:
+
+  git clone https://github.com/Ackie1980/Claude-MCP-Installer.git; cd Claude-MCP-Installer; powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP-GUI.ps1
+
+Or for the command-line version:
+
+  git clone https://github.com/Ackie1980/Claude-MCP-Installer.git; cd Claude-MCP-Installer; powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP.ps1
 
 REQUIREMENTS
 ------------
@@ -30,32 +39,50 @@ AVAILABLE MCP SERVERS
    - Access Outlook, OneDrive, Calendar, Teams, and other M365 services
    - Requires: Node.js
 
-3. Teams MCP
+3. CLI for Microsoft 365 MCP
+   - Manage Microsoft 365 using PnP CLI - SharePoint, Teams, Entra ID,
+     Power Platform and more
+   - Requires: Node.js, CLI for Microsoft 365 installed globally
+
+4. Teams MCP
    - Microsoft Teams integration for chats and channels
    - Requires: Node.js
 
-4. Excel MCP
+5. Excel MCP
    - Read and write Excel files, create tables and charts
    - Requires: Node.js
 
-5. Word Document MCP
+6. Word Document MCP
    - Create and edit Word documents
    - Requires: Python, UV
 
-6. PowerPoint MCP
+7. PowerPoint MCP
    - Create and edit PowerPoint presentations
    - Requires: Python, UV
 
-7. TeamTailor MCP
-   - TeamTailor recruitment platform integration
-   - Requires: Node.js, TeamTailor API key
+8. Notion MCP (NEW)
+   - Official Notion MCP Server - Access and manage Notion workspaces,
+     pages, databases and blocks
+   - Requires: Node.js, Notion Integration Token
 
-8. Conversation Watchdog MCP
-   - Monitors conversations for truncation and enables recovery
-   - Requires: Python, custom script
+9. Airtable MCP (NEW)
+   - Read and write to Airtable bases, tables and records
+   - Requires: Node.js, Airtable Personal Access Token
 
-9. HubSpot MCP
-   - HubSpot CRM integration (requires separate marketplace installation)
+10. TeamTailor MCP
+    - TeamTailor recruitment platform integration
+    - Requires: Node.js, TeamTailor API key
+
+11. Google Cloud Storage MCP
+    - Interact with Google Cloud Storage buckets
+    - Requires: Node.js, Google Cloud Project ID
+
+12. Conversation Watchdog MCP
+    - Monitors conversations for truncation and enables recovery
+    - Requires: Python, custom script
+
+13. HubSpot MCP
+    - HubSpot CRM integration (requires separate marketplace installation)
 
 HOW TO USE
 ----------
@@ -71,7 +98,7 @@ Method 2: Command-line interface
 Method 3: Run PowerShell directly
   - Open PowerShell
   - Navigate to this folder
-  - Run: .\Install-ClaudeMCP.ps1
+  - Run: powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP.ps1
 
 Method 4: With parameters
   - Skip prerequisites check: .\Install-ClaudeMCP.ps1 -SkipPrerequisites
@@ -87,6 +114,7 @@ WHAT THE INSTALLER DOES
 6. Prompts for paths and API keys as needed
 7. Creates/updates the claude_desktop_config.json file
 8. Backs up any existing configuration
+9. PRESERVES existing MCP configurations (won't remove your current MCPs)
 
 CONFIGURATION FILE LOCATION
 ---------------------------
@@ -95,8 +123,8 @@ Windows: %APPDATA%\Claude\claude_desktop_config.json
 TROUBLESHOOTING
 ---------------
 Issue: "Script cannot be loaded because running scripts is disabled"
-Solution: Run the .bat file instead, or execute:
-  Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+Solution: Use the -ExecutionPolicy Bypass flag:
+  powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP-GUI.ps1
 
 Issue: Node.js installation fails
 Solution: Install manually from https://nodejs.org
@@ -110,12 +138,17 @@ Solution:
   2. Check the config file for syntax errors
   3. Verify all paths are correct
 
+Issue: "Test-NodeJS is not recognized" error in GUI
+Solution: Make sure both Install-ClaudeMCP.ps1 and Install-ClaudeMCP-GUI.ps1
+are in the same directory
+
 MANUAL CONFIGURATION
 --------------------
 If you need to manually edit the MCP configuration, the file is located at:
   %APPDATA%\Claude\claude_desktop_config.json
 
-Example configuration entry:
+Example configuration entries:
+
 {
   "mcpServers": {
     "excel": {
@@ -124,13 +157,35 @@ Example configuration entry:
       "env": {
         "EXCEL_MCP_PAGING_CELLS_LIMIT": "4000"
       }
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_TOKEN": "ntn_your_token_here"
+      }
+    },
+    "airtable": {
+      "command": "npx",
+      "args": ["-y", "airtable-mcp-server"],
+      "env": {
+        "AIRTABLE_API_KEY": "your_api_key_here"
+      }
     }
   }
 }
 
+API KEY SETUP LINKS
+-------------------
+- Notion: https://www.notion.so/profile/integrations
+- Airtable: https://airtable.com/create/tokens
+- TeamTailor: Contact your TeamTailor administrator
+- Google Cloud: https://console.cloud.google.com
+
 SUPPORT
 -------
-For issues with this installer, contact Quality By Design NV.
-For Claude Code issues, visit: https://github.com/anthropics/claude-code/issues
+For issues with this installer: https://github.com/Ackie1980/Claude-MCP-Installer/issues
+For Claude Code issues: https://github.com/anthropics/claude-code/issues
+GitHub Repository: https://github.com/Ackie1980/Claude-MCP-Installer
 
 ============================================================================
