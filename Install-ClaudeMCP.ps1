@@ -1864,6 +1864,216 @@ function Save-MCPConfig {
     return $configPath
 }
 
+function Get-InstalledMCPs {
+    Write-Log "=== Getting installed MCPs ===" "INFO"
+
+    $configPath = "$env:APPDATA\Claude\claude_desktop_config.json"
+
+    if (-not (Test-Path $configPath)) {
+        Write-Log "Config file not found: $configPath" "DEBUG"
+        return @{}
+    }
+
+    try {
+        $config = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
+        if ($config.mcpServers) {
+            Write-Log "Found $($config.mcpServers.Count) installed MCPs" "DEBUG"
+            return $config.mcpServers
+        }
+    } catch {
+        Write-Log "Error reading config file: $_" "ERROR"
+    }
+
+    return @{}
+}
+
+function Show-InstalledMCPsMenu {
+    $installedMCPs = Get-InstalledMCPs
+
+    if ($installedMCPs.Count -eq 0) {
+        Write-Host ""
+        Write-Host "No MCP servers are currently installed." -ForegroundColor $colors.Warning
+        Write-Host ""
+        return $null
+    }
+
+    Write-Header "Installed MCP Servers"
+
+    Write-Host "The following MCP servers are currently configured:" -ForegroundColor $colors.Info
+    Write-Host ""
+
+    $index = 1
+    $menuItems = @{}
+
+    foreach ($key in $installedMCPs.Keys | Sort-Object) {
+        $menuItems[$index] = $key
+        $mcp = $installedMCPs[$key]
+
+        # Try to get friendly name from our definitions
+        $friendlyName = $key
+        if ($MCPServers.ContainsKey($key)) {
+            $friendlyName = $MCPServers[$key].Name
+        }
+
+        Write-Host "  [$index] " -NoNewline -ForegroundColor $colors.Warning
+        Write-Host "$friendlyName" -ForegroundColor $colors.Info
+        Write-Host "      Key: $key" -ForegroundColor Gray
+
+        if ($mcp.command) {
+            Write-Host "      Command: $($mcp.command)" -ForegroundColor Gray
+        }
+        Write-Host ""
+        $index++
+    }
+
+    Write-Host "  [A] Remove ALL MCP servers" -ForegroundColor $colors.Error
+    Write-Host "  [Q] Cancel and go back" -ForegroundColor $colors.Warning
+    Write-Host ""
+
+    return $menuItems
+}
+
+function Get-MCPsToRemove {
+    param($MenuItems, $InstalledMCPs)
+
+    $selections = @()
+
+    Write-Host "Enter the numbers of MCPs to remove (comma-separated), 'A' for all, or 'Q' to cancel:" -ForegroundColor $colors.Menu
+    $userInput = Read-Host "Selection"
+
+    if ($userInput -eq 'Q' -or $userInput -eq 'q') {
+        return $null
+    }
+
+    if ($userInput -eq 'A' -or $userInput -eq 'a') {
+        return @($InstalledMCPs.Keys)
+    }
+
+    $numbers = $userInput -split ',' | ForEach-Object { $_.Trim() }
+    foreach ($num in $numbers) {
+        try {
+            $intNum = [int]$num
+            if ($MenuItems.ContainsKey($intNum)) {
+                $selections += $MenuItems[$intNum]
+            }
+        } catch { }
+    }
+
+    return $selections
+}
+
+function Remove-MCPServers {
+    param(
+        [string[]]$MCPsToRemove
+    )
+
+    Write-Log "=== Removing MCP servers ===" "INFO"
+    Write-Log "MCPs to remove: $($MCPsToRemove -join ', ')" "DEBUG"
+
+    $configPath = "$env:APPDATA\Claude\claude_desktop_config.json"
+
+    if (-not (Test-Path $configPath)) {
+        Write-Err "Config file not found: $configPath"
+        return $false
+    }
+
+    try {
+        # Create backup first
+        $backupPath = "$configPath.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Copy-Item $configPath $backupPath
+        Write-Success "Backed up config to: $backupPath"
+
+        # Read current config
+        $config = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
+
+        if (-not $config.mcpServers) {
+            Write-Warn "No MCP servers found in config"
+            return $false
+        }
+
+        $removedCount = 0
+        foreach ($mcpKey in $MCPsToRemove) {
+            if ($config.mcpServers.ContainsKey($mcpKey)) {
+                $config.mcpServers.Remove($mcpKey)
+                Write-Success "Removed: $mcpKey"
+                Write-Log "Removed MCP: $mcpKey" "INFO"
+                $removedCount++
+            } else {
+                Write-Warn "MCP not found: $mcpKey"
+            }
+        }
+
+        # Save updated config
+        $jsonConfig = $config | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($configPath, $jsonConfig, [System.Text.UTF8Encoding]::new($false))
+
+        Write-Host ""
+        Write-Success "Removed $removedCount MCP server(s) from configuration"
+        Write-Host ""
+        Write-Host "Remaining MCP servers: $($config.mcpServers.Count)" -ForegroundColor $colors.Info
+
+        return $true
+
+    } catch {
+        Write-Log "Error removing MCPs: $_" "ERROR"
+        Write-Err "Failed to remove MCPs: $_"
+        return $false
+    }
+}
+
+function Show-RemoveMCPMenu {
+    $installedMCPs = Get-InstalledMCPs
+
+    if ($installedMCPs.Count -eq 0) {
+        Write-Host ""
+        Write-Host "No MCP servers are currently installed." -ForegroundColor $colors.Warning
+        Write-Host ""
+        Write-Host "Press any key to continue..." -ForegroundColor $colors.Info
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        return
+    }
+
+    $menuItems = Show-InstalledMCPsMenu
+
+    if ($null -eq $menuItems) {
+        return
+    }
+
+    $mcpsToRemove = Get-MCPsToRemove -MenuItems $menuItems -InstalledMCPs $installedMCPs
+
+    if ($null -eq $mcpsToRemove -or $mcpsToRemove.Count -eq 0) {
+        Write-Host ""
+        Write-Host "No MCPs selected for removal." -ForegroundColor $colors.Warning
+        return
+    }
+
+    # Confirm removal
+    Write-Host ""
+    Write-Host "You are about to remove the following MCP servers:" -ForegroundColor $colors.Warning
+    foreach ($mcp in $mcpsToRemove) {
+        Write-Host "  - $mcp" -ForegroundColor $colors.Error
+    }
+    Write-Host ""
+
+    $confirm = Read-Host "Are you sure you want to remove these MCPs? (y/n)"
+
+    if ($confirm -eq 'y' -or $confirm -eq 'Y') {
+        $result = Remove-MCPServers -MCPsToRemove $mcpsToRemove
+
+        if ($result) {
+            Write-Host ""
+            Write-Host "MCP removal complete. Please restart Claude Desktop for changes to take effect." -ForegroundColor $colors.Success
+        }
+    } else {
+        Write-Host ""
+        Write-Host "Removal cancelled." -ForegroundColor $colors.Info
+    }
+
+    Write-Host ""
+    Write-Host "Press any key to continue..." -ForegroundColor $colors.Info
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
+
 # ============================================================================
 # Windows Forms GUI
 # ============================================================================
@@ -2687,7 +2897,7 @@ function Main {
     # Initialize logging
     Initialize-Log
 
-    Write-Header "Claude Code & MCP Servers Installer v2.0"
+    Write-Header "Claude Code & MCP Servers Installer v2.2"
     Write-Host "This installer will set up Claude Code CLI and configure MCP servers" -ForegroundColor $colors.Info
     Write-Host "for Claude Desktop on this machine." -ForegroundColor $colors.Info
     Write-Host ""
@@ -2708,6 +2918,39 @@ function Main {
         Write-Warn "Some installations may require elevated permissions."
         Write-Host ""
     }
+
+    # -------------------------------------------------------------------------
+    # Main Menu - Choose Action
+    # -------------------------------------------------------------------------
+
+    Write-Host "What would you like to do?" -ForegroundColor $colors.Menu
+    Write-Host ""
+    Write-Host "  [1] Install MCP servers" -ForegroundColor $colors.Success
+    Write-Host "      Add new MCP servers to Claude Desktop"
+    Write-Host ""
+    Write-Host "  [2] Remove MCP servers" -ForegroundColor $colors.Warning
+    Write-Host "      Remove existing MCP servers from configuration"
+    Write-Host ""
+    Write-Host "  [Q] Quit" -ForegroundColor Gray
+    Write-Host ""
+
+    $mainChoice = Read-Host "Enter your choice (1/2/Q)"
+
+    if ($mainChoice -eq 'Q' -or $mainChoice -eq 'q') {
+        Write-Host ""
+        Write-Host "Goodbye!" -ForegroundColor $colors.Info
+        return
+    }
+
+    if ($mainChoice -eq '2') {
+        Show-RemoveMCPMenu
+        Write-Host ""
+        Write-Host "Press any key to exit..." -ForegroundColor $colors.Info
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        return
+    }
+
+    # Continue with installation flow (choice 1 or default)
 
     # -------------------------------------------------------------------------
     # Step 1: Show current component status
