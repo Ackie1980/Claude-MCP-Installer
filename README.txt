@@ -1,7 +1,7 @@
 ============================================================================
 Claude Code & MCP Servers Installer
 ============================================================================
-Version: 2.1.0
+Version: 2.2.0
 Author: Ackie
 
 DESCRIPTION
@@ -9,6 +9,11 @@ DESCRIPTION
 This installer sets up Claude Code CLI and configures MCP (Model Context
 Protocol) servers for Claude Desktop. It handles all prerequisites and
 allows users to choose which MCP servers to install.
+
+NEW IN VERSION 2.2: Added automatic installation of VS Code and PowerBI
+extension prerequisites for PowerBI Modeling MCP. The installer now
+automatically installs VS Code and the PowerBI Modeling MCP extension
+when selected.
 
 NEW IN VERSION 2.1: Added Notion and Airtable MCP servers, improved GUI
 configuration panel layout, and fixed encoding issues.
@@ -37,55 +42,50 @@ AVAILABLE MCP SERVERS
 ---------------------
 1. PowerBI Modeling MCP
    - Manipulate Power BI semantic models via Tabular Editor
-   - Requires: VS Code PowerBI extension installed
+   - Requires: VS Code, VS Code PowerBI extension (auto-installed)
 
 2. Microsoft 365 MCP
    - Access Outlook, OneDrive, Calendar, Teams, and other M365 services
    - Requires: Node.js
 
-3. CLI for Microsoft 365 MCP
-   - Manage Microsoft 365 using PnP CLI - SharePoint, Teams, Entra ID,
-     Power Platform and more
-   - Requires: Node.js, CLI for Microsoft 365 installed globally
-
-4. Teams MCP
+3. Teams MCP
    - Microsoft Teams integration for chats and channels
    - Requires: Node.js
 
-5. Excel MCP
+4. Excel MCP
    - Read and write Excel files, create tables and charts
    - Requires: Node.js
 
-6. Word Document MCP
+5. Word Document MCP
    - Create and edit Word documents
    - Requires: Python, UV
 
-7. PowerPoint MCP
+6. PowerPoint MCP
    - Create and edit PowerPoint presentations
    - Requires: Python, UV
 
-8. Notion MCP (NEW)
+7. Notion MCP
    - Official Notion MCP Server - Access and manage Notion workspaces,
      pages, databases and blocks
    - Requires: Node.js, Notion Integration Token
 
-9. Airtable MCP (NEW)
+8. Airtable MCP
    - Read and write to Airtable bases, tables and records
    - Requires: Node.js, Airtable Personal Access Token
 
-10. TeamTailor MCP
-    - TeamTailor recruitment platform integration
-    - Requires: Node.js, TeamTailor API key
+9. TeamTailor MCP
+   - TeamTailor recruitment platform integration
+   - Requires: Node.js, TeamTailor API key
 
-11. Google Cloud Storage MCP
+10. Google Cloud Storage MCP
     - Interact with Google Cloud Storage buckets
     - Requires: Node.js, Google Cloud Project ID
 
-12. Conversation Watchdog MCP
+11. Conversation Watchdog MCP
     - Monitors conversations for truncation and enables recovery
     - Requires: Python, custom script
 
-13. HubSpot MCP
+12. HubSpot MCP
     - HubSpot CRM integration (requires separate marketplace installation)
 
 HOW TO USE
@@ -114,11 +114,13 @@ WHAT THE INSTALLER DOES
 2. Checks and installs Python (if not present)
 3. Checks and installs UV package manager (if not present)
 4. Installs Claude Code CLI via npm
-5. Presents a menu to select which MCP servers to install
-6. Prompts for paths and API keys as needed
-7. Creates/updates the claude_desktop_config.json file
-8. Backs up any existing configuration
-9. PRESERVES existing MCP configurations (won't remove your current MCPs)
+5. Checks and installs VS Code (if not present)
+6. Checks and installs VS Code PowerBI extension (if not present)
+7. Presents a menu to select which MCP servers to install
+8. Prompts for paths and API keys as needed
+9. Creates/updates the claude_desktop_config.json file
+10. Backs up any existing configuration
+11. PRESERVES existing MCP configurations (won't remove your current MCPs)
 
 CONFIGURATION FILE LOCATION
 ---------------------------

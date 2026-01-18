@@ -75,6 +75,8 @@ $script:InstalledComponents = @{
     Python = $false
     UV = $false
     ClaudeCode = $false
+    VSCode = $false
+    VSCodePowerBI = $false
 }
 
 # ============================================================================
@@ -581,7 +583,7 @@ $MCPServers = @{
         UsernameDefault = "$env:USERNAME"
         PathTemplate = "C:\Users\{USERNAME}\.vscode\extensions"
         PathPattern = "analysis-services.powerbi-modeling-mcp-*-win32-x64"
-        Prerequisites = @()
+        Prerequisites = @("vscode", "vscode-powerbi")
         Config = @{
             command = "{PATH}\server\powerbi-modeling-mcp.exe"
             args = @("--start")
@@ -784,33 +786,6 @@ $MCPServers = @{
             }
         }
     }
-    "cli-microsoft365" = @{
-        Name = "CLI for Microsoft 365 MCP"
-        Description = "Manage Microsoft 365 using PnP CLI - SharePoint, Teams, Entra ID, Power Platform and more"
-        Type = "npx"
-        RequiresPath = $false
-        Prerequisites = @("nodejs")
-        PreInstallNote = @"
-
-  CLI for Microsoft 365 MCP Server - Additional Setup Required:
-
-  This MCP server requires the CLI for Microsoft 365 to be installed globally:
-  1. Run: npm i -g @pnp/cli-microsoft365
-  2. Configure the CLI:
-     m365 cli config set --key prompt --value false
-     m365 cli config set --key output --value text
-     m365 cli config set --key helpMode --value full
-  3. Authenticate: m365 login
-
-  The MCP server will use your existing CLI authentication context.
-  For more info: https://github.com/pnp/cli-microsoft365-mcp-server
-
-"@
-        Config = @{
-            command = "npx"
-            args = @("-y", "@pnp/cli-microsoft365-mcp-server@latest")
-        }
-    }
     "notion" = @{
         Name = "Notion MCP"
         Description = "Official Notion MCP Server - Access and manage Notion workspaces, pages, databases and blocks"
@@ -1001,6 +976,60 @@ function Get-ClaudeVersion {
     return $null
 }
 
+function Get-VSCodeVersion {
+    Write-Log "Checking for VS Code..." "DEBUG"
+    if (Test-CommandExists "code") {
+        try {
+            $version = code --version 2>$null | Select-Object -First 1
+            Write-Log "VS Code found: $version" "DEBUG"
+            return $version
+        } catch {
+            Write-Log "VS Code command failed: $_" "DEBUG"
+        }
+    }
+    Write-Log "VS Code not found" "DEBUG"
+    return $null
+}
+
+function Get-VSCodePowerBIExtension {
+    Write-Log "Checking for VS Code PowerBI extension..." "DEBUG"
+
+    # First check if VS Code is available
+    if (-not (Test-CommandExists "code")) {
+        Write-Log "VS Code not found, cannot check for PowerBI extension" "DEBUG"
+        return $null
+    }
+
+    try {
+        $extensions = code --list-extensions 2>$null
+        if ($extensions -match "analysis-services\.powerbi-modeling-mcp") {
+            Write-Log "PowerBI Modeling MCP extension found" "DEBUG"
+
+            # Try to get version from extension folder
+            $extensionPath = "$env:USERPROFILE\.vscode\extensions"
+            $found = Get-ChildItem -Path $extensionPath -Filter "analysis-services.powerbi-modeling-mcp-*-win32-x64" -Directory -ErrorAction SilentlyContinue |
+                     Sort-Object Name -Descending |
+                     Select-Object -First 1
+
+            if ($found) {
+                # Extract version from folder name
+                if ($found.Name -match "powerbi-modeling-mcp-(\d+\.\d+\.\d+)") {
+                    $version = $matches[1]
+                    Write-Log "PowerBI extension version: $version" "DEBUG"
+                    return $version
+                }
+                return "installed"
+            }
+            return "installed"
+        }
+    } catch {
+        Write-Log "VS Code extension check failed: $_" "DEBUG"
+    }
+
+    Write-Log "PowerBI Modeling MCP extension not found" "DEBUG"
+    return $null
+}
+
 function Show-ComponentStatus {
     Write-Header "System Component Status"
 
@@ -1054,6 +1083,32 @@ function Show-ComponentStatus {
         Write-Host "  [" -NoNewline
         Write-Host "NOT FOUND" -ForegroundColor $colors.NotInstalled -NoNewline
         Write-Host "] Claude Code CLI"
+    }
+
+    # Check VS Code
+    $vscodeVersion = Get-VSCodeVersion
+    if ($vscodeVersion) {
+        $script:InstalledComponents.VSCode = $true
+        Write-Host "  [" -NoNewline
+        Write-Host "INSTALLED" -ForegroundColor $colors.Installed -NoNewline
+        Write-Host "] VS Code: $vscodeVersion"
+    } else {
+        Write-Host "  [" -NoNewline
+        Write-Host "NOT FOUND" -ForegroundColor $colors.NotInstalled -NoNewline
+        Write-Host "] VS Code"
+    }
+
+    # Check VS Code PowerBI Extension
+    $powerbiExtVersion = Get-VSCodePowerBIExtension
+    if ($powerbiExtVersion) {
+        $script:InstalledComponents.VSCodePowerBI = $true
+        Write-Host "  [" -NoNewline
+        Write-Host "INSTALLED" -ForegroundColor $colors.Installed -NoNewline
+        Write-Host "] VS Code PowerBI Extension: $powerbiExtVersion"
+    } else {
+        Write-Host "  [" -NoNewline
+        Write-Host "NOT FOUND" -ForegroundColor $colors.NotInstalled -NoNewline
+        Write-Host "] VS Code PowerBI Extension"
     }
 
     Write-Host ""
@@ -1273,6 +1328,113 @@ function Install-ClaudeCode {
     return $false
 }
 
+function Install-VSCode {
+    Write-Log "=== Starting VS Code installation ===" "INFO"
+
+    if ($script:InstalledComponents.VSCode) {
+        Write-Success "VS Code is already installed"
+        return $true
+    }
+
+    Write-Step "Installing VS Code via winget..."
+    try {
+        Write-Log "Executing: winget install Microsoft.VisualStudioCode" "DEBUG"
+        $result = winget install Microsoft.VisualStudioCode --accept-source-agreements --accept-package-agreements -e 2>&1
+        Write-Log "Winget output: $result" "DEBUG"
+        Refresh-Path
+        Start-Sleep -Seconds 3
+
+        if (Get-VSCodeVersion) {
+            $script:InstalledComponents.VSCode = $true
+            Write-Success "VS Code installed successfully"
+            return $true
+        }
+        Write-Log "VS Code not found after winget install" "WARN"
+    } catch {
+        Write-Log "Winget installation exception: $_" "ERROR"
+        Write-Warn "Winget installation failed. Trying alternative method..."
+    }
+
+    # Alternative: Download and install manually
+    Write-Step "Downloading VS Code installer..."
+    $vscodeUrl = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64"
+    $installerPath = "$env:TEMP\VSCodeSetup.exe"
+    Write-Log "Download URL: $vscodeUrl" "DEBUG"
+    Write-Log "Installer path: $installerPath" "DEBUG"
+
+    try {
+        Invoke-WebRequest -Uri $vscodeUrl -OutFile $installerPath -UseBasicParsing
+        Write-Log "Download complete" "DEBUG"
+        Write-Step "Running VS Code installer..."
+        Write-Log "Executing: $installerPath /VERYSILENT /NORESTART /MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath" "DEBUG"
+        Start-Process $installerPath -ArgumentList "/VERYSILENT /NORESTART /MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath" -Wait
+        Refresh-Path
+        Start-Sleep -Seconds 3
+
+        if (Get-VSCodeVersion) {
+            $script:InstalledComponents.VSCode = $true
+            Write-Success "VS Code installed successfully"
+            return $true
+        }
+        Write-Log "VS Code not found after direct install" "ERROR"
+    } catch {
+        Write-Log "Direct installation exception: $_" "ERROR"
+        Write-Err "Failed to install VS Code: $_"
+    }
+
+    Write-Err "VS Code installation failed. Please install manually from https://code.visualstudio.com"
+    return $false
+}
+
+function Install-VSCodePowerBIExtension {
+    Write-Log "=== Starting VS Code PowerBI Extension installation ===" "INFO"
+
+    if ($script:InstalledComponents.VSCodePowerBI) {
+        Write-Success "VS Code PowerBI Extension is already installed"
+        return $true
+    }
+
+    if (-not $script:InstalledComponents.VSCode) {
+        Write-Warn "VS Code is required to install PowerBI Extension"
+        return $false
+    }
+
+    Write-Step "Installing VS Code PowerBI Modeling MCP Extension..."
+    try {
+        Write-Log "Executing: code --install-extension analysis-services.powerbi-modeling-mcp" "DEBUG"
+        $result = code --install-extension analysis-services.powerbi-modeling-mcp 2>&1
+        Write-Log "VS Code extension install output: $result" "DEBUG"
+
+        # Wait for extension to install
+        Start-Sleep -Seconds 5
+
+        if (Get-VSCodePowerBIExtension) {
+            $script:InstalledComponents.VSCodePowerBI = $true
+            Write-Success "VS Code PowerBI Extension installed successfully"
+            return $true
+        }
+        Write-Log "PowerBI extension not found after install" "WARN"
+
+        # Retry once more with longer wait
+        Write-Step "Waiting for extension installation to complete..."
+        Start-Sleep -Seconds 10
+
+        if (Get-VSCodePowerBIExtension) {
+            $script:InstalledComponents.VSCodePowerBI = $true
+            Write-Success "VS Code PowerBI Extension installed successfully"
+            return $true
+        }
+        Write-Log "PowerBI extension still not found after retry" "ERROR"
+    } catch {
+        Write-Log "Extension installation exception: $_" "ERROR"
+        Write-Err "Failed to install PowerBI Extension: $_"
+    }
+
+    Write-Warn "PowerBI Extension installation may have failed."
+    Write-Warn "Install manually: Open VS Code > Extensions > Search 'PowerBI Modeling MCP' > Install"
+    return $false
+}
+
 function Install-PythonPackages {
     param([string[]]$Packages)
 
@@ -1357,6 +1519,8 @@ function Show-MCPMenu {
                     "nodejs" { if (-not $script:InstalledComponents.NodeJS) { $missing += "Node.js" } }
                     "python" { if (-not $script:InstalledComponents.Python) { $missing += "Python" } }
                     "uv" { if (-not $script:InstalledComponents.UV) { $missing += "UV" } }
+                    "vscode" { if (-not $script:InstalledComponents.VSCode) { $missing += "VS Code" } }
+                    "vscode-powerbi" { if (-not $script:InstalledComponents.VSCodePowerBI) { $missing += "VS Code PowerBI Extension" } }
                 }
             }
 
@@ -1411,6 +1575,8 @@ function Get-UserSelections {
                         "nodejs" { if (-not $script:InstalledComponents.NodeJS) { $canInstall = $false } }
                         "python" { if (-not $script:InstalledComponents.Python) { $canInstall = $false } }
                         "uv" { if (-not $script:InstalledComponents.UV) { $canInstall = $false } }
+                        "vscode" { if (-not $script:InstalledComponents.VSCode) { $canInstall = $false } }
+                        "vscode-powerbi" { if (-not $script:InstalledComponents.VSCodePowerBI) { $canInstall = $false } }
                     }
                 }
             }
@@ -2563,6 +2729,8 @@ function Main {
         if (-not $script:InstalledComponents.Python) { $missingComponents += "Python" }
         if (-not $script:InstalledComponents.UV) { $missingComponents += "UV" }
         if (-not $script:InstalledComponents.ClaudeCode) { $missingComponents += "Claude Code CLI" }
+        if (-not $script:InstalledComponents.VSCode) { $missingComponents += "VS Code" }
+        if (-not $script:InstalledComponents.VSCodePowerBI) { $missingComponents += "VS Code PowerBI Extension" }
 
         if ($missingComponents.Count -gt 0) {
             Write-Header "Install Missing Components"
@@ -2592,6 +2760,14 @@ function Main {
 
                 if (-not $script:InstalledComponents.ClaudeCode -and $script:InstalledComponents.NodeJS) {
                     Install-ClaudeCode | Out-Null
+                }
+
+                if (-not $script:InstalledComponents.VSCode) {
+                    Install-VSCode | Out-Null
+                }
+
+                if (-not $script:InstalledComponents.VSCodePowerBI -and $script:InstalledComponents.VSCode) {
+                    Install-VSCodePowerBIExtension | Out-Null
                 }
 
                 Write-Host ""

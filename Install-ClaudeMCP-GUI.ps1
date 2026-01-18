@@ -43,6 +43,16 @@ function Test-ClaudeCode {
     return ($null -ne $version)
 }
 
+function Test-VSCode {
+    $version = Get-VSCodeVersion
+    return ($null -ne $version)
+}
+
+function Test-VSCodePowerBI {
+    $version = Get-VSCodePowerBIExtension
+    return ($null -ne $version)
+}
+
 # ============================================================================
 # GUI Configuration
 # ============================================================================
@@ -231,7 +241,9 @@ function Update-PrerequisitesStatus {
         @{ Name = "Node.js"; Check = { Test-NodeJS }; Install = { Install-NodeJS } },
         @{ Name = "Python 3"; Check = { Test-Python }; Install = { Install-Python } },
         @{ Name = "UV (Python Package Manager)"; Check = { Test-UV }; Install = { Install-UV } },
-        @{ Name = "Claude Code CLI"; Check = { Test-ClaudeCode }; Install = { Install-ClaudeCode } }
+        @{ Name = "Claude Code CLI"; Check = { Test-ClaudeCode }; Install = { Install-ClaudeCode } },
+        @{ Name = "VS Code"; Check = { Test-VSCode }; Install = { Install-VSCode } },
+        @{ Name = "VS Code PowerBI Extension"; Check = { Test-VSCodePowerBI }; Install = { Install-VSCodePowerBIExtension } }
     )
 
     $yPos = 15
