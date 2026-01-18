@@ -1,7 +1,7 @@
 ============================================================================
 Claude Code & MCP Servers Installer
 ============================================================================
-Version: 2.1.0
+Version: 2.2.0
 Author: Ackie
 
 DESCRIPTION
@@ -9,6 +9,11 @@ DESCRIPTION
 This installer sets up Claude Code CLI and configures MCP (Model Context
 Protocol) servers for Claude Desktop. It handles all prerequisites and
 allows users to choose which MCP servers to install.
+
+NEW IN VERSION 2.2: Added automatic installation of VS Code and PowerBI
+extension prerequisites for PowerBI Modeling MCP. The installer now
+automatically installs VS Code and the PowerBI Modeling MCP extension
+when selected.
 
 NEW IN VERSION 2.1: Added Notion and Airtable MCP servers, improved GUI
 configuration panel layout, and fixed encoding issues.
@@ -37,7 +42,7 @@ AVAILABLE MCP SERVERS
 ---------------------
 1. PowerBI Modeling MCP
    - Manipulate Power BI semantic models via Tabular Editor
-   - Requires: VS Code PowerBI extension installed
+   - Requires: VS Code, VS Code PowerBI extension (auto-installed)
 
 2. Microsoft 365 MCP
    - Access Outlook, OneDrive, Calendar, Teams, and other M365 services
@@ -114,11 +119,13 @@ WHAT THE INSTALLER DOES
 2. Checks and installs Python (if not present)
 3. Checks and installs UV package manager (if not present)
 4. Installs Claude Code CLI via npm
-5. Presents a menu to select which MCP servers to install
-6. Prompts for paths and API keys as needed
-7. Creates/updates the claude_desktop_config.json file
-8. Backs up any existing configuration
-9. PRESERVES existing MCP configurations (won't remove your current MCPs)
+5. Checks and installs VS Code (if not present)
+6. Checks and installs VS Code PowerBI extension (if not present)
+7. Presents a menu to select which MCP servers to install
+8. Prompts for paths and API keys as needed
+9. Creates/updates the claude_desktop_config.json file
+10. Backs up any existing configuration
+11. PRESERVES existing MCP configurations (won't remove your current MCPs)
 
 CONFIGURATION FILE LOCATION
 ---------------------------
