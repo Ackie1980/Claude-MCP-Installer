@@ -15,13 +15,17 @@ configuration panel layout, and fixed encoding issues.
 
 QUICK INSTALL FROM GITHUB
 -------------------------
-Run this one-liner in PowerShell:
+Run this one-liner in PowerShell (from a folder like Desktop or Documents):
 
-  git clone https://github.com/Ackie1980/Claude-MCP-Installer.git; cd Claude-MCP-Installer; powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP-GUI.ps1
+  cd $HOME\Desktop; if (Test-Path Claude-MCP-Installer) { Remove-Item -Recurse -Force Claude-MCP-Installer }; git clone https://github.com/Ackie1980/Claude-MCP-Installer.git; cd Claude-MCP-Installer; powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP-GUI.ps1
 
 Or for the command-line version:
 
-  git clone https://github.com/Ackie1980/Claude-MCP-Installer.git; cd Claude-MCP-Installer; powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP.ps1
+  cd $HOME\Desktop; if (Test-Path Claude-MCP-Installer) { Remove-Item -Recurse -Force Claude-MCP-Installer }; git clone https://github.com/Ackie1980/Claude-MCP-Installer.git; cd Claude-MCP-Installer; powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP.ps1
+
+NOTE: The command changes to your Desktop folder first, removes any existing
+      Claude-MCP-Installer folder, then clones fresh. You can change Desktop
+      to any folder you prefer (e.g., Documents).
 
 REQUIREMENTS
 ------------
@@ -122,6 +126,21 @@ Windows: %APPDATA%\Claude\claude_desktop_config.json
 
 TROUBLESHOOTING
 ---------------
+Issue: "destination path 'Claude-MCP-Installer' already exists" when running
+       git clone
+Solution: The folder already exists from a previous install attempt. Either:
+  1. Use the updated install command above (includes automatic cleanup), or
+  2. Manually delete the folder first:
+       Remove-Item -Recurse -Force Claude-MCP-Installer
+  3. Or navigate into the existing folder and pull updates:
+       cd Claude-MCP-Installer; git pull
+
+Issue: "cd : Cannot find path" or running from C:\Windows\system32
+Solution: Don't run the install command from system32. First change to a user
+  folder like Desktop:
+    cd $HOME\Desktop
+  Then run the install command.
+
 Issue: "Script cannot be loaded because running scripts is disabled"
 Solution: Use the -ExecutionPolicy Bypass flag:
   powershell -ExecutionPolicy Bypass -File .\Install-ClaudeMCP-GUI.ps1
