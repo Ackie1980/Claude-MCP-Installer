@@ -786,33 +786,6 @@ $MCPServers = @{
             }
         }
     }
-    "cli-microsoft365" = @{
-        Name = "CLI for Microsoft 365 MCP"
-        Description = "Manage Microsoft 365 using PnP CLI - SharePoint, Teams, Entra ID, Power Platform and more"
-        Type = "npx"
-        RequiresPath = $false
-        Prerequisites = @("nodejs")
-        PreInstallNote = @"
-
-  CLI for Microsoft 365 MCP Server - Additional Setup Required:
-
-  This MCP server requires the CLI for Microsoft 365 to be installed globally:
-  1. Run: npm i -g @pnp/cli-microsoft365
-  2. Configure the CLI:
-     m365 cli config set --key prompt --value false
-     m365 cli config set --key output --value text
-     m365 cli config set --key helpMode --value full
-  3. Authenticate: m365 login
-
-  The MCP server will use your existing CLI authentication context.
-  For more info: https://github.com/pnp/cli-microsoft365-mcp-server
-
-"@
-        Config = @{
-            command = "npx"
-            args = @("-y", "@pnp/cli-microsoft365-mcp-server@latest")
-        }
-    }
     "notion" = @{
         Name = "Notion MCP"
         Description = "Official Notion MCP Server - Access and manage Notion workspaces, pages, databases and blocks"

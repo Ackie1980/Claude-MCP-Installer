@@ -48,49 +48,44 @@ AVAILABLE MCP SERVERS
    - Access Outlook, OneDrive, Calendar, Teams, and other M365 services
    - Requires: Node.js
 
-3. CLI for Microsoft 365 MCP
-   - Manage Microsoft 365 using PnP CLI - SharePoint, Teams, Entra ID,
-     Power Platform and more
-   - Requires: Node.js, CLI for Microsoft 365 installed globally
-
-4. Teams MCP
+3. Teams MCP
    - Microsoft Teams integration for chats and channels
    - Requires: Node.js
 
-5. Excel MCP
+4. Excel MCP
    - Read and write Excel files, create tables and charts
    - Requires: Node.js
 
-6. Word Document MCP
+5. Word Document MCP
    - Create and edit Word documents
    - Requires: Python, UV
 
-7. PowerPoint MCP
+6. PowerPoint MCP
    - Create and edit PowerPoint presentations
    - Requires: Python, UV
 
-8. Notion MCP (NEW)
+7. Notion MCP
    - Official Notion MCP Server - Access and manage Notion workspaces,
      pages, databases and blocks
    - Requires: Node.js, Notion Integration Token
 
-9. Airtable MCP (NEW)
+8. Airtable MCP
    - Read and write to Airtable bases, tables and records
    - Requires: Node.js, Airtable Personal Access Token
 
-10. TeamTailor MCP
-    - TeamTailor recruitment platform integration
-    - Requires: Node.js, TeamTailor API key
+9. TeamTailor MCP
+   - TeamTailor recruitment platform integration
+   - Requires: Node.js, TeamTailor API key
 
-11. Google Cloud Storage MCP
+10. Google Cloud Storage MCP
     - Interact with Google Cloud Storage buckets
     - Requires: Node.js, Google Cloud Project ID
 
-12. Conversation Watchdog MCP
+11. Conversation Watchdog MCP
     - Monitors conversations for truncation and enables recovery
     - Requires: Python, custom script
 
-13. HubSpot MCP
+12. HubSpot MCP
     - HubSpot CRM integration (requires separate marketplace installation)
 
 HOW TO USE
