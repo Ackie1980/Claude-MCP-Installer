@@ -159,7 +159,7 @@ function New-WelcomePage {
     $panel.Controls.Add($title)
 
     # Subtitle
-    $subtitle = New-StyledLabel -Text "Version 2.0.0" -FontSize 12 -ForeColor ([System.Drawing.Color]::Gray)
+    $subtitle = New-StyledLabel -Text "Version 2.2.0" -FontSize 12 -ForeColor ([System.Drawing.Color]::Gray)
     $subtitle.Location = New-Object System.Drawing.Point(50, 85)
     $panel.Controls.Add($subtitle)
 
@@ -173,27 +173,144 @@ This wizard will help you:
     - Install Claude Code CLI (command-line interface)
     - Configure MCP (Model Context Protocol) servers
     - Set up integrations for Microsoft 365, Excel, PowerBI, and more
+    - Remove existing MCP servers from your configuration
 
 Before you begin:
     - Ensure you have an internet connection
     - Close Claude Desktop if it's running
     - Some components may require administrator privileges
 
-Click 'Next' to check prerequisites and begin the installation.
+Click 'Next' to install new MCP servers, or use 'Manage MCPs' to
+view and remove existing MCP server configurations.
 "@
     $desc.Font = New-Object System.Drawing.Font($script:GuiConfig.FontFamily, 10, [System.Drawing.FontStyle]::Regular)
     $desc.ForeColor = $script:GuiConfig.TextColor
     $desc.BackColor = [System.Drawing.Color]::Transparent
     $desc.Location = New-Object System.Drawing.Point(50, 130)
-    $desc.Size = New-Object System.Drawing.Size(580, 280)
+    $desc.Size = New-Object System.Drawing.Size(580, 250)
     $panel.Controls.Add($desc)
+
+    # Manage MCPs button
+    $manageMcpsBtn = New-StyledButton -Text "Manage MCPs" -Width 140 -BackColor ([System.Drawing.Color]::FromArgb(180, 100, 60))
+    $manageMcpsBtn.Location = New-Object System.Drawing.Point(50, 390)
+    $manageMcpsBtn.Name = "ManageMcpsBtn"
+    $panel.Controls.Add($manageMcpsBtn)
 
     # Author
     $author = New-StyledLabel -Text "By Ackie" -FontSize 9 -ForeColor ([System.Drawing.Color]::Gray)
-    $author.Location = New-Object System.Drawing.Point(50, 420)
+    $author.Location = New-Object System.Drawing.Point(50, 435)
     $panel.Controls.Add($author)
 
     return $panel
+}
+
+function New-ManageMCPsPage {
+    $panel = New-Object System.Windows.Forms.Panel
+    $panel.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $panel.BackColor = $script:GuiConfig.PrimaryColor
+
+    # Title
+    $title = New-StyledLabel -Text "Manage MCP Servers" -FontSize 18 -FontStyle ([System.Drawing.FontStyle]::Bold)
+    $title.Location = New-Object System.Drawing.Point(50, 30)
+    $panel.Controls.Add($title)
+
+    # Description
+    $desc = New-StyledLabel -Text "Select MCP servers to remove from your configuration:" -FontSize 10
+    $desc.Location = New-Object System.Drawing.Point(50, 70)
+    $panel.Controls.Add($desc)
+
+    # Scrollable panel for MCPs
+    $scrollPanel = New-Object System.Windows.Forms.Panel
+    $scrollPanel.Location = New-Object System.Drawing.Point(50, 110)
+    $scrollPanel.Size = New-Object System.Drawing.Size(580, 250)
+    $scrollPanel.BackColor = $script:GuiConfig.SecondaryColor
+    $scrollPanel.AutoScroll = $true
+    $scrollPanel.Name = "MCPScrollPanel"
+    $panel.Controls.Add($scrollPanel)
+
+    # Remove button
+    $removeBtn = New-StyledButton -Text "Remove Selected" -Width 150 -BackColor ([System.Drawing.Color]::FromArgb(200, 80, 80))
+    $removeBtn.Location = New-Object System.Drawing.Point(50, 375)
+    $removeBtn.Name = "RemoveMcpsBtn"
+    $panel.Controls.Add($removeBtn)
+
+    # Refresh button
+    $refreshBtn = New-StyledButton -Text "Refresh" -Width 100 -BackColor $script:GuiConfig.SecondaryColor
+    $refreshBtn.Location = New-Object System.Drawing.Point(210, 375)
+    $refreshBtn.Name = "RefreshMcpsBtn"
+    $panel.Controls.Add($refreshBtn)
+
+    # Back to Install button
+    $backToInstallBtn = New-StyledButton -Text "Back to Install" -Width 120 -BackColor $script:GuiConfig.AccentColor
+    $backToInstallBtn.Location = New-Object System.Drawing.Point(320, 375)
+    $backToInstallBtn.Name = "BackToInstallBtn"
+    $panel.Controls.Add($backToInstallBtn)
+
+    # Status label
+    $statusLabel = New-StyledLabel -Text "" -FontSize 10 -ForeColor $script:GuiConfig.SuccessColor
+    $statusLabel.Location = New-Object System.Drawing.Point(50, 415)
+    $statusLabel.Name = "StatusLabel"
+    $statusLabel.Size = New-Object System.Drawing.Size(580, 25)
+    $panel.Controls.Add($statusLabel)
+
+    return $panel
+}
+
+function Update-ManageMCPsPage {
+    param($Panel)
+
+    $scrollPanel = $Panel.Controls["MCPScrollPanel"]
+    $scrollPanel.Controls.Clear()
+
+    $installedMCPs = Get-InstalledMCPs
+
+    if ($installedMCPs.Count -eq 0) {
+        $noMcpsLabel = New-StyledLabel -Text "No MCP servers are currently installed." -FontSize 11
+        $noMcpsLabel.Location = New-Object System.Drawing.Point(15, 15)
+        $scrollPanel.Controls.Add($noMcpsLabel)
+
+        $Panel.Controls["RemoveMcpsBtn"].Enabled = $false
+        return
+    }
+
+    $Panel.Controls["RemoveMcpsBtn"].Enabled = $true
+    $yPos = 15
+
+    foreach ($key in $installedMCPs.Keys | Sort-Object) {
+        $mcp = $installedMCPs[$key]
+
+        # Get friendly name
+        $friendlyName = $key
+        if ($MCPServers.ContainsKey($key)) {
+            $friendlyName = $MCPServers[$key].Name
+        }
+
+        $checkPanel = New-Object System.Windows.Forms.Panel
+        $checkPanel.Location = New-Object System.Drawing.Point(10, $yPos)
+        $checkPanel.Size = New-Object System.Drawing.Size(540, 55)
+        $checkPanel.BackColor = [System.Drawing.Color]::Transparent
+
+        $checkbox = New-StyledCheckBox -Text $friendlyName -Tag $key
+        $checkbox.Location = New-Object System.Drawing.Point(5, 5)
+        $checkbox.Name = "chk_remove_$key"
+        $checkPanel.Controls.Add($checkbox)
+
+        # Show command info
+        $infoLabel = New-Object System.Windows.Forms.Label
+        $infoLabel.Text = "Key: $key"
+        if ($mcp.command) {
+            $infoLabel.Text += " | Command: $($mcp.command)"
+        }
+        $infoLabel.Font = New-Object System.Drawing.Font($script:GuiConfig.FontFamily, 8, [System.Drawing.FontStyle]::Italic)
+        $infoLabel.ForeColor = [System.Drawing.Color]::Gray
+        $infoLabel.Location = New-Object System.Drawing.Point(25, 30)
+        $infoLabel.AutoSize = $true
+        $infoLabel.BackColor = [System.Drawing.Color]::Transparent
+        $checkPanel.Controls.Add($infoLabel)
+
+        $scrollPanel.Controls.Add($checkPanel)
+        $yPos += 60
+    }
 }
 
 function New-PrerequisitesPage {
@@ -610,14 +727,15 @@ function Show-InstallerWizard {
     $pageContainer.Name = "PageContainer"
     $form.Controls.Add($pageContainer)
 
-    # Create pages
+    # Create pages (page 6 is the Manage MCPs page, accessible from Welcome)
     $pages = @(
-        (New-WelcomePage),
-        (New-PrerequisitesPage),
-        (New-ServerSelectionPage),
-        (New-ConfigurationPage),
-        (New-InstallationPage),
-        (New-CompletionPage)
+        (New-WelcomePage),           # 0
+        (New-PrerequisitesPage),     # 1
+        (New-ServerSelectionPage),   # 2
+        (New-ConfigurationPage),     # 3
+        (New-InstallationPage),      # 4
+        (New-CompletionPage),        # 5
+        (New-ManageMCPsPage)         # 6 - Manage/Remove MCPs
     )
 
     foreach ($page in $pages) {
@@ -694,6 +812,20 @@ function Show-InstallerWizard {
                 $nextBtn.Enabled = $true
                 $backBtn.Enabled = $false
             }
+            6 {
+                # Manage MCPs page - hide navigation
+                $nextBtn.Visible = $false
+                $backBtn.Visible = $false
+                $cancelBtn.Visible = $false
+                Update-ManageMCPsPage -Panel $pages[6]
+            }
+        }
+
+        # Show navigation for non-manage pages
+        if ($PageIndex -ne 6) {
+            $nextBtn.Visible = $true
+            $backBtn.Visible = $true
+            $cancelBtn.Visible = $true
         }
     }
 
@@ -715,7 +847,8 @@ function Show-InstallerWizard {
                 $form.Close()
             }
             default {
-                if ($script:CurrentPage -lt ($pages.Count - 1)) {
+                # Don't go to page 6 (Manage MCPs) via Next - max is page 5 (Completion)
+                if ($script:CurrentPage -lt 5) {
                     & $showPage ($script:CurrentPage + 1)
                 }
             }
@@ -782,6 +915,73 @@ function Show-InstallerWizard {
                 }
             }
         }
+    })
+
+    # Welcome page - Manage MCPs button handler
+    $welcomePage = $pages[0]
+    $manageMcpsBtn = $welcomePage.Controls["ManageMcpsBtn"]
+    $manageMcpsBtn.Add_Click({
+        & $showPage 6
+    })
+
+    # Manage MCPs page handlers
+    $managePage = $pages[6]
+
+    $removeMcpsBtn = $managePage.Controls["RemoveMcpsBtn"]
+    $removeMcpsBtn.Add_Click({
+        $scrollPanel = $pages[6].Controls["MCPScrollPanel"]
+        $statusLabel = $pages[6].Controls["StatusLabel"]
+
+        # Get selected MCPs to remove
+        $mcpsToRemove = @()
+        foreach ($control in $scrollPanel.Controls) {
+            foreach ($checkbox in $control.Controls) {
+                if ($checkbox -is [System.Windows.Forms.CheckBox] -and $checkbox.Checked) {
+                    $mcpsToRemove += $checkbox.Tag
+                }
+            }
+        }
+
+        if ($mcpsToRemove.Count -eq 0) {
+            $statusLabel.ForeColor = $script:GuiConfig.WarningColor
+            $statusLabel.Text = "No MCP servers selected for removal."
+            return
+        }
+
+        # Confirm removal
+        $result = [System.Windows.Forms.MessageBox]::Show(
+            "Are you sure you want to remove $($mcpsToRemove.Count) MCP server(s)?`n`n$($mcpsToRemove -join ', ')",
+            "Confirm Removal",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        )
+
+        if ($result -eq [System.Windows.Forms.DialogResult]::Yes) {
+            $success = Remove-MCPServers -MCPsToRemove $mcpsToRemove
+
+            if ($success) {
+                $statusLabel.ForeColor = $script:GuiConfig.SuccessColor
+                $statusLabel.Text = "Successfully removed $($mcpsToRemove.Count) MCP server(s). Restart Claude Desktop."
+            } else {
+                $statusLabel.ForeColor = $script:GuiConfig.ErrorColor
+                $statusLabel.Text = "Failed to remove some MCP servers. Check the log file."
+            }
+
+            # Refresh the list
+            Update-ManageMCPsPage -Panel $pages[6]
+        }
+    })
+
+    $refreshMcpsBtn = $managePage.Controls["RefreshMcpsBtn"]
+    $refreshMcpsBtn.Add_Click({
+        $statusLabel = $pages[6].Controls["StatusLabel"]
+        $statusLabel.Text = ""
+        Update-ManageMCPsPage -Panel $pages[6]
+    })
+
+    $backToInstallBtn = $managePage.Controls["BackToInstallBtn"]
+    $backToInstallBtn.Add_Click({
+        & $showPage 0
     })
 
     # Show first page

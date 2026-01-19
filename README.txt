@@ -10,10 +10,12 @@ This installer sets up Claude Code CLI and configures MCP (Model Context
 Protocol) servers for Claude Desktop. It handles all prerequisites and
 allows users to choose which MCP servers to install.
 
-NEW IN VERSION 2.2: Added automatic installation of VS Code and PowerBI
-extension prerequisites for PowerBI Modeling MCP. The installer now
-automatically installs VS Code and the PowerBI Modeling MCP extension
-when selected.
+NEW IN VERSION 2.2:
+- Added automatic installation of VS Code and PowerBI extension
+  prerequisites for PowerBI Modeling MCP
+- Added ability to safely remove MCP servers from configuration
+  (available in both CLI and GUI modes)
+- Main menu now offers choice between Install and Remove modes
 
 NEW IN VERSION 2.1: Added Notion and Airtable MCP servers, improved GUI
 configuration panel layout, and fixed encoding issues.
@@ -110,6 +112,7 @@ Method 4: With parameters
 
 WHAT THE INSTALLER DOES
 -----------------------
+Install Mode:
 1. Checks and installs Node.js (if not present)
 2. Checks and installs Python (if not present)
 3. Checks and installs UV package manager (if not present)
@@ -121,6 +124,12 @@ WHAT THE INSTALLER DOES
 9. Creates/updates the claude_desktop_config.json file
 10. Backs up any existing configuration
 11. PRESERVES existing MCP configurations (won't remove your current MCPs)
+
+Remove Mode:
+1. Lists all currently installed MCP servers from your configuration
+2. Allows you to select one or more MCPs to remove
+3. Creates a backup of your configuration before making changes
+4. Safely removes selected MCPs while preserving all other settings
 
 CONFIGURATION FILE LOCATION
 ---------------------------
