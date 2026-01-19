@@ -23,6 +23,11 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 # ============================================================================
 # These wrap the Get-*Version functions from the main script
 
+function Test-Git {
+    $version = Get-GitVersion
+    return ($null -ne $version)
+}
+
 function Test-NodeJS {
     $version = Get-NodeVersion
     return ($null -ne $version)
@@ -238,6 +243,7 @@ function Update-PrerequisitesStatus {
 
     # Check components
     $components = @(
+        @{ Name = "Git"; Check = { Test-Git }; Install = { Install-Git } },
         @{ Name = "Node.js"; Check = { Test-NodeJS }; Install = { Install-NodeJS } },
         @{ Name = "Python 3"; Check = { Test-Python }; Install = { Install-Python } },
         @{ Name = "UV (Python Package Manager)"; Check = { Test-UV }; Install = { Install-UV } },
@@ -741,6 +747,7 @@ function Show-InstallerWizard {
         $this.Text = "Installing..."
 
         # Install missing prerequisites
+        if (-not (Test-Git)) { $null = Install-Git }
         if (-not (Test-NodeJS)) { $null = Install-NodeJS }
         if (-not (Test-Python)) { $null = Install-Python }
         if (-not (Test-UV)) { $null = Install-UV }

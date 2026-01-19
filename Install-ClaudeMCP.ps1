@@ -71,6 +71,7 @@ $colors = @{
 
 # Global status tracking
 $script:InstalledComponents = @{
+    Git = $false
     NodeJS = $false
     Python = $false
     UV = $false
@@ -905,6 +906,21 @@ function Refresh-Path {
 # Component Detection Functions
 # ============================================================================
 
+function Get-GitVersion {
+    Write-Log "Checking for Git..." "DEBUG"
+    if (Test-CommandExists "git") {
+        try {
+            $version = git --version 2>$null
+            Write-Log "Git found: $version" "DEBUG"
+            return $version
+        } catch {
+            Write-Log "Git command failed: $_" "DEBUG"
+        }
+    }
+    Write-Log "Git not found" "DEBUG"
+    return $null
+}
+
 function Get-NodeVersion {
     Write-Log "Checking for Node.js..." "DEBUG"
     if (Test-CommandExists "node") {
@@ -1033,6 +1049,19 @@ function Get-VSCodePowerBIExtension {
 function Show-ComponentStatus {
     Write-Header "System Component Status"
 
+    # Check Git
+    $gitVersion = Get-GitVersion
+    if ($gitVersion) {
+        $script:InstalledComponents.Git = $true
+        Write-Host "  [" -NoNewline
+        Write-Host "INSTALLED" -ForegroundColor $colors.Installed -NoNewline
+        Write-Host "] Git: $gitVersion"
+    } else {
+        Write-Host "  [" -NoNewline
+        Write-Host "NOT FOUND" -ForegroundColor $colors.NotInstalled -NoNewline
+        Write-Host "] Git"
+    }
+
     # Check Node.js
     $nodeVersion = Get-NodeVersion
     if ($nodeVersion) {
@@ -1117,6 +1146,64 @@ function Show-ComponentStatus {
 # ============================================================================
 # Installation Functions
 # ============================================================================
+
+function Install-Git {
+    Write-Log "=== Starting Git installation ===" "INFO"
+
+    if ($script:InstalledComponents.Git) {
+        Write-Success "Git is already installed"
+        return $true
+    }
+
+    Write-Step "Installing Git via winget..."
+    try {
+        Write-Log "Executing: winget install Git.Git" "DEBUG"
+        $result = winget install Git.Git --accept-source-agreements --accept-package-agreements -e 2>&1
+        Write-Log "Winget output: $result" "DEBUG"
+        Refresh-Path
+        Start-Sleep -Seconds 2
+
+        if (Get-GitVersion) {
+            $script:InstalledComponents.Git = $true
+            Write-Success "Git installed successfully"
+            return $true
+        }
+        Write-Log "Git not found after winget install" "WARN"
+    } catch {
+        Write-Log "Winget installation exception: $_" "ERROR"
+        Write-Warn "Winget installation failed. Trying alternative method..."
+    }
+
+    # Alternative: Download and install manually
+    Write-Step "Downloading Git installer..."
+    $gitUrl = "https://github.com/git-for-windows/git/releases/download/v2.43.0.windows.1/Git-2.43.0-64-bit.exe"
+    $installerPath = "$env:TEMP\git-installer.exe"
+    Write-Log "Download URL: $gitUrl" "DEBUG"
+    Write-Log "Installer path: $installerPath" "DEBUG"
+
+    try {
+        Invoke-WebRequest -Uri $gitUrl -OutFile $installerPath -UseBasicParsing
+        Write-Log "Download complete" "DEBUG"
+        Write-Step "Running Git installer..."
+        Write-Log "Executing: $installerPath /VERYSILENT /NORESTART" "DEBUG"
+        Start-Process $installerPath -ArgumentList "/VERYSILENT /NORESTART" -Wait
+        Refresh-Path
+        Start-Sleep -Seconds 2
+
+        if (Get-GitVersion) {
+            $script:InstalledComponents.Git = $true
+            Write-Success "Git installed successfully"
+            return $true
+        }
+        Write-Log "Git not found after manual install" "ERROR"
+    } catch {
+        Write-Log "Manual installation exception: $_" "ERROR"
+        Write-Err "Failed to install Git: $_"
+    }
+
+    Write-Err "Git installation failed. Please install manually from https://git-scm.com"
+    return $false
+}
 
 function Install-NodeJS {
     Write-Log "=== Starting Node.js installation ===" "INFO"
@@ -1957,7 +2044,7 @@ function Show-GUI {
     $componentLabels = @{}
     $componentIcons = @{}
     $componentCards = @{}
-    $components = @("Node.js", "Python", "UV", "Claude Code")
+    $components = @("Git", "Node.js", "Python", "UV", "Claude Code")
     $xPos = 0
     $cardWidth = 175
 
@@ -2207,6 +2294,20 @@ function Show-GUI {
     # ========================================
     $form.Add_Shown({
         Update-GuiLog "Checking system components..."
+
+        # Check Git
+        $gitVersion = Get-GitVersion
+        if ($gitVersion) {
+            $script:InstalledComponents.Git = $true
+            $componentIcons["Git"].ForeColor = $successColor
+            $componentLabels["Git"].Text = $gitVersion
+            $componentLabels["Git"].ForeColor = $successColor
+        } else {
+            $componentIcons["Git"].ForeColor = $errorColor
+            $componentLabels["Git"].Text = "Not installed"
+            $componentLabels["Git"].ForeColor = $errorColor
+        }
+        [System.Windows.Forms.Application]::DoEvents()
 
         # Check Node.js
         $nodeVersion = Get-NodeVersion
@@ -2725,6 +2826,7 @@ function Main {
     if (-not $SkipPrerequisites) {
         $missingComponents = @()
 
+        if (-not $script:InstalledComponents.Git) { $missingComponents += "Git" }
         if (-not $script:InstalledComponents.NodeJS) { $missingComponents += "Node.js" }
         if (-not $script:InstalledComponents.Python) { $missingComponents += "Python" }
         if (-not $script:InstalledComponents.UV) { $missingComponents += "UV" }
@@ -2745,6 +2847,10 @@ function Main {
 
             if ($installChoice -eq 'y' -or $installChoice -eq 'Y') {
                 Write-Host ""
+
+                if (-not $script:InstalledComponents.Git) {
+                    Install-Git | Out-Null
+                }
 
                 if (-not $script:InstalledComponents.NodeJS) {
                     Install-NodeJS | Out-Null
