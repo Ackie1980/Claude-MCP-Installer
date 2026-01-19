@@ -1894,20 +1894,28 @@ function Save-MCPConfig {
         New-Item -ItemType Directory -Path $configDir -Force | Out-Null
     }
 
-    # Backup existing config if present
+    # Backup existing config if present and merge with it
     if (Test-Path $configPath) {
         $backupPath = "$configPath.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         Copy-Item $configPath $backupPath
         Write-Success "Backed up existing config to: $backupPath"
 
-        # Merge with existing config (preserve existing MCPs, skip duplicates)
+        # Merge with existing config (preserve ALL existing MCPs and other settings)
         try {
             $existingConfig = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
 
-            if ($existingConfig.mcpServers) {
+            if ($null -eq $existingConfig) {
+                Write-Warn "Existing config was empty, creating new one"
+            } else {
+                # Ensure mcpServers exists in existing config
+                if (-not $existingConfig.mcpServers) {
+                    $existingConfig.mcpServers = @{}
+                }
+
                 $skippedMcps = @()
                 $addedMcps = @()
 
+                # Only add new MCPs, never overwrite existing ones
                 foreach ($key in $Config.mcpServers.Keys) {
                     if ($existingConfig.mcpServers.ContainsKey($key)) {
                         # MCP already exists, skip it (don't overwrite)
@@ -1929,10 +1937,28 @@ function Save-MCPConfig {
                     Write-Success "Added new MCPs: $($addedMcps -join ', ')"
                 }
 
+                # Use the merged existing config (preserves ALL existing MCPs and other settings)
                 $Config = $existingConfig
+
+                Write-Log "Preserved $($existingConfig.mcpServers.Count - $addedMcps.Count) existing MCPs" "INFO"
             }
         } catch {
-            Write-Warn "Could not parse existing config, creating new one"
+            Write-Err "Could not parse existing config: $_"
+            Write-Warn "Your existing config may be malformed. Check the backup at: $backupPath"
+            Write-Warn "Proceeding with new configuration only - existing MCPs will NOT be preserved!"
+
+            # Ask for confirmation before potentially losing data
+            Write-Host ""
+            Write-Host "WARNING: This will overwrite your existing config!" -ForegroundColor Red
+            Write-Host "Press 'Y' to continue or any other key to abort..." -ForegroundColor Yellow
+            $response = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            if ($response.Character -ne 'Y' -and $response.Character -ne 'y') {
+                Write-Host ""
+                Write-Warn "Aborted. Your existing config was not modified."
+                Write-Host "Please fix your config file manually and try again." -ForegroundColor $colors.Info
+                return $null
+            }
+            Write-Host ""
         }
     }
 
