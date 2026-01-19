@@ -1877,7 +1877,7 @@ function Build-MCPConfig {
         Write-Success "Configured: $($server.Name)"
     }
 
-    Write-Log "MCP configuration complete. Servers configured: $($mcpConfig.mcpServers.Count)" "INFO"
+    Write-Log "MCP configuration complete. Servers configured: $($mcpConfig.mcpServers.Keys.Count)" "INFO"
     return $mcpConfig
 }
 
@@ -1964,7 +1964,7 @@ function Get-InstalledMCPs {
     try {
         $config = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
         if ($config.mcpServers) {
-            Write-Log "Found $($config.mcpServers.Count) installed MCPs" "DEBUG"
+            Write-Log "Found $($config.mcpServers.Keys.Count) installed MCPs" "DEBUG"
             return $config.mcpServers
         }
     } catch {
@@ -1977,7 +1977,7 @@ function Get-InstalledMCPs {
 function Show-InstalledMCPsMenu {
     $installedMCPs = Get-InstalledMCPs
 
-    if ($installedMCPs.Count -eq 0) {
+    if ($installedMCPs.Keys.Count -eq 0) {
         Write-Host ""
         Write-Host "No MCP servers are currently installed." -ForegroundColor $colors.Warning
         Write-Host ""
@@ -2097,7 +2097,7 @@ function Remove-MCPServers {
         Write-Host ""
         Write-Success "Removed $removedCount MCP server(s) from configuration"
         Write-Host ""
-        Write-Host "Remaining MCP servers: $($config.mcpServers.Count)" -ForegroundColor $colors.Info
+        Write-Host "Remaining MCP servers: $($config.mcpServers.Keys.Count)" -ForegroundColor $colors.Info
 
         return $true
 
@@ -2111,7 +2111,7 @@ function Remove-MCPServers {
 function Show-RemoveMCPMenu {
     $installedMCPs = Get-InstalledMCPs
 
-    if ($installedMCPs.Count -eq 0) {
+    if ($installedMCPs.Keys.Count -eq 0) {
         Write-Host ""
         Write-Host "No MCP servers are currently installed." -ForegroundColor $colors.Warning
         Write-Host ""
@@ -2932,7 +2932,7 @@ function Show-GUI {
         }
 
         # Save configuration
-        if ($configuredServers.mcpServers.Count -gt 0) {
+        if ($configuredServers.mcpServers.Keys.Count -gt 0) {
             Update-GuiLog "Saving configuration..."
             try {
                 $configPath = Save-MCPConfig -Config $configuredServers
@@ -3162,7 +3162,7 @@ function Main {
 
     $mcpConfig = Build-MCPConfig -SelectedServers $selectedServers
 
-    if ($mcpConfig.mcpServers.Count -gt 0) {
+    if ($mcpConfig.mcpServers.Keys.Count -gt 0) {
         $configPath = Save-MCPConfig -Config $mcpConfig
         Write-Log "Configuration saved to: $configPath" "INFO"
 

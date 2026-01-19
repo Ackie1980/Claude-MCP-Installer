@@ -264,7 +264,7 @@ function Update-ManageMCPsPage {
 
     $installedMCPs = Get-InstalledMCPs
 
-    if ($installedMCPs.Count -eq 0) {
+    if ($installedMCPs.Keys.Count -eq 0) {
         $noMcpsLabel = New-StyledLabel -Text "No MCP servers are currently installed." -FontSize 11
         $noMcpsLabel.Location = New-Object System.Drawing.Point(15, 15)
         $scrollPanel.Controls.Add($noMcpsLabel)
@@ -1113,7 +1113,7 @@ function Start-Installation {
         # Save configuration
         & $updateUI "Saving configuration..." 90 "[INFO] Saving configuration to claude_desktop_config.json..."
 
-        if ($mcpConfig.mcpServers.Count -gt 0) {
+        if ($mcpConfig.mcpServers.Keys.Count -gt 0) {
             $configPath = Save-MCPConfig -Config $mcpConfig
             & $updateUI "Configuration saved!" 100 "[OK] Configuration saved to: $configPath"
         }
